@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type Entry = { id: string; last4: string; image?: string; createdAt: string };
+type Entry = { id: string; last4: string; image?: string; imageHash?: string; createdAt: string };
 const STORAGE_KEY = "dna-pub-vip-records-v2";
 const cycleStart = () => {
   const now = new Date();
@@ -30,6 +30,12 @@ const cycleStart = () => {
   return start.toISOString().slice(0, 10);
 };
 const formatTime = (iso: string) => new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+const fingerprintImage = async (dataUrl: string) => {
+  const raw = atob(dataUrl.split(",")[1] || "");
+  const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
 const download = (content: BlobPart, name: string, type: string) => {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement("a"); a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
@@ -49,20 +55,32 @@ export default function Home() {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }, [entries]);
 
   const current = useMemo(() => entries.filter((e) => e.createdAt.slice(0, 10) >= today), [entries, today]);
-  const addEntry = (last4: string, image?: string) => {
+  const addEntry = async (last4: string, image?: string, imageHash?: string) => {
     const value = last4.replace(/\D/g, "").slice(-4);
-    if (value.length !== 4) { toast.error("กรุณาระบุเลข 4 ตัวท้ายให้ครบ"); return; }
-    if (current.length >= 100) { toast.error("รอบนี้ครบ 100 เคสแล้ว"); return; }
-    const next = { id: crypto.randomUUID(), last4: value, image, createdAt: new Date().toISOString() };
+    if (value.length !== 4) { toast.error("กรุณาระบุเลข 4 ตัวท้ายให้ครบ"); return false; }
+    if (current.length >= 100) { toast.error("รอบนี้ครบ 100 เคสแล้ว"); return false; }
+    if (current.some((entry) => entry.last4 === value)) { toast.error(`บันทึกไม่ได้: เลข ${value} มีอยู่แล้วในรอบนี้`); return false; }
+    const resolvedHash = imageHash || (image ? await fingerprintImage(image) : undefined);
+    if (resolvedHash) {
+      for (const entry of current.filter((item) => item.image)) {
+        const existingHash = entry.imageHash || await fingerprintImage(entry.image!);
+        if (existingHash === resolvedHash) { toast.error("บันทึกไม่ได้: ภาพนี้มีอยู่แล้วในรอบนี้"); return false; }
+      }
+    }
+    const next = { id: crypto.randomUUID(), last4: value, image, imageHash: resolvedHash, createdAt: new Date().toISOString() };
     setEntries((all) => [next, ...all]); setManual(""); setNotice(`บันทึกข้อมูลสำเร็จ เวลา ${formatTime(next.createdAt)} น.`); toast.success("บันทึกข้อมูลสำเร็จ");
     window.setTimeout(() => setNotice(null), 4800);
+    return true;
   };
   const scan = async (file: File) => {
     const image = await new Promise<string>((resolve) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.readAsDataURL(file); });
+    const imageHash = await fingerprintImage(image);
+    const duplicateImage = current.some((entry) => entry.imageHash === imageHash);
+    if (duplicateImage) { toast.error("บันทึกไม่ได้: ภาพนี้มีอยู่แล้วในรอบนี้"); return; }
     let found = "";
     const engine = (window as typeof window & { Tesseract?: { recognize: (img: string, lang: string) => Promise<{ data: { text: string } }> } }).Tesseract;
     if (engine) { try { const result = await engine.recognize(image, "eng"); found = result.data.text.replace(/\D/g, "").slice(-4); } catch { /* manual fallback below */ } }
-    if (found.length === 4) addEntry(found, image); else { setPreview(image); toast.info("อ่านเลขไม่ครบ กรุณาตรวจสอบแล้วกรอกเลข 4 ตัวท้ายด้วยตนเอง"); }
+    if (found.length === 4) await addEntry(found, image, imageHash); else { setPreview(image); toast.info("อ่านเลขไม่ครบ กรุณาตรวจสอบแล้วกรอกเลข 4 ตัวท้ายด้วยตนเอง"); }
   };
   const exportCsv = () => download(["เลข 4 ตัวท้าย,เวลา\n", ...entries.map((e) => `${e.last4},${new Date(e.createdAt).toLocaleString("th-TH")}`)].join("\n"), `dna-pub-${today}.csv`, "text/csv;charset=utf-8");
   const exportJson = () => download(JSON.stringify(entries, null, 2), `dna-pub-${today}.json`, "application/json");
@@ -86,7 +104,7 @@ export default function Home() {
 
       {notice && <div className="success-banner"><div className="success-icon"><Check size={22} /></div><div><strong>{notice}</strong><p>จัดเก็บในเครื่องนี้แล้ว และตรวจสอบซ้ำได้อีก 10 วัน</p></div><button aria-label="ปิดการแจ้งเตือน" onClick={() => setNotice(null)}><X size={19} /></button></div>}
 
-      <section className="manual-panel"><div className="panel-heading"><div className="panel-icon"><ScanLine size={19} /></div><div><div className="section-kicker">02 · MANUAL FALLBACK</div><p>กรณีไม่ต้องการถ่ายรูป ให้พิมพ์เลข 4 ตัวท้าย</p></div></div><form onSubmit={(e) => { e.preventDefault(); addEntry(manual); }}><input value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" maxLength={4} placeholder="เช่น 1234" aria-label="เลข 4 ตัวท้ายบัตร" /><button type="submit"><Check size={17} />บันทึกมือ</button></form></section>
+      <section className="manual-panel"><div className="panel-heading"><div className="panel-icon"><ScanLine size={19} /></div><div><div className="section-kicker">02 · MANUAL FALLBACK</div><p>กรณีไม่ต้องการถ่ายรูป ให้พิมพ์เลข 4 ตัวท้าย</p></div></div><form onSubmit={async (e) => { e.preventDefault(); await addEntry(manual); }}><input value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" maxLength={4} placeholder="เช่น 1234" aria-label="เลข 4 ตัวท้ายบัตร" /><button type="submit"><Check size={17} />บันทึกมือ</button></form></section>
 
       <section className="backup-panel"><div className="panel-heading"><div className="panel-icon"><Archive size={19} /></div><div><div className="section-kicker">03 · FREE BACKUP</div><p>ดาวน์โหลดไปเก็บใน Google Drive หรือเปิด CSV ด้วย Google Sheets</p></div><div className="backup-readout">LOCAL<br /><strong>READY</strong></div></div><div className="backup-actions"><button onClick={exportCsv}><FileSpreadsheet size={16} />CSV / Sheets</button><button onClick={exportJson}><FileJson size={16} />JSON</button><button onClick={exportImage}><ImageIcon size={16} />รูปภาพ</button><button onClick={share}><Share2 size={16} />แชร์ข้อมูล</button></div></section>
 
