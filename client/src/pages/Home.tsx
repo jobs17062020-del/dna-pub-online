@@ -22,6 +22,7 @@ import { toast } from "sonner";
 
 type Entry = { id: string; last4: string; image?: string; imageHash?: string; createdAt: string };
 const STORAGE_KEY = "dna-pub-vip-records-v2";
+const assetBase = import.meta.env.PROD ? "/dna-pub-online/" : "/";
 const cycleStart = () => {
   const now = new Date();
   const start = new Date(now);
@@ -88,10 +89,10 @@ export default function Home() {
   const share = async () => { const text = `DNA PUB\nบันทึกแล้ว ${current.length}/100 เคส\nรอบวันที่ ${today}`; if (navigator.share) await navigator.share({ title: "DNA PUB", text }); else { await navigator.clipboard.writeText(text); toast.success("คัดลอกสรุปข้อมูลแล้ว"); } };
 
   return <main className="app-shell">
-    <div className="ambient ambient-top" />
+    <div className="ambient ambient-top" style={{ backgroundImage: `url(${assetBase}assets/dna-pub-signal-texture.webp)` }} />
     <div className="container page-flow">
       <header className="topbar">
-        <div className="brand-lockup"><div className="brand-mark"><img src="/manus-storage/dna-pub-mark_8b2ff8e1.png" alt="DNA PUB" /></div><div><div className="eyebrow"><span className="signal-dot" /> DNA VIP DATABASE</div><h1>DNA PUB</h1><p>ระบบตรวจสอบสิทธิ์วันเกิด · รอบละ 10 วัน</p></div></div>
+        <div className="brand-lockup"><div className="brand-mark"><img src={`${assetBase}assets/dna-pub-mark.png`} alt="DNA PUB" /></div><div><div className="eyebrow"><span className="signal-dot" /> DNA VIP DATABASE</div><h1>DNA PUB</h1><p>ระบบตรวจสอบสิทธิ์วันเกิด · รอบละ 10 วัน</p></div></div>
         <div className="privacy-pill"><LockKeyhole size={15} />ข้อมูลอยู่ในเครื่องนี้<br /><strong>ไม่ส่งออกอัตโนมัติ</strong></div>
       </header>
 
@@ -108,7 +109,7 @@ export default function Home() {
 
       <section className="backup-panel"><div className="panel-heading"><div className="panel-icon"><Archive size={19} /></div><div><div className="section-kicker">03 · FREE BACKUP</div><p>ดาวน์โหลดไปเก็บใน Google Drive หรือเปิด CSV ด้วย Google Sheets</p></div><div className="backup-readout">LOCAL<br /><strong>READY</strong></div></div><div className="backup-actions"><button onClick={exportCsv}><FileSpreadsheet size={16} />CSV / Sheets</button><button onClick={exportJson}><FileJson size={16} />JSON</button><button onClick={exportImage}><ImageIcon size={16} />รูปภาพ</button><button onClick={share}><Share2 size={16} />แชร์ข้อมูล</button></div></section>
 
-      <section className="history-card"><div className="history-head"><div><div className="title-row"><span className="signal-dot" /><h2>ประวัติสิทธิ์วันเกิด</h2></div><p>ย้อนหลัง 10 วัน · แตะที่รูปเพื่อขยาย</p></div><div className="count-badge">{current.length} / 100 วันนี้</div></div>{entries.length === 0 ? <div className="empty-state"><img src="/manus-storage/dna-pub-empty-state_31acaa3c.png" alt="ยังไม่มีข้อมูล" /><strong>ยังไม่มีข้อมูลในรอบ 10 วัน</strong><p>เริ่มจากการถ่ายรูปหรือบันทึกเลขท้ายบัตรด้านบน</p></div> : <div className="entry-list">{entries.map((e) => <article className="entry-row" key={e.id}>{e.image ? <button className="thumb" onClick={() => setPreview(e.image!)}><img src={e.image} alt="ภาพหลักฐานวันเกิด" /></button> : <div className="thumb-placeholder"><Database size={17} /></div>}<div><strong>•••• {e.last4}</strong><p>{formatTime(e.createdAt)} น. · {e.createdAt.slice(0, 10)}</p></div><button className="delete" aria-label="ลบรายการ" onClick={() => setEntries((all) => all.filter((x) => x.id !== e.id))}><Trash2 size={16} /></button></article>)}</div>}<footer className="storage-note"><Sparkles size={15} />จัดเก็บภายในเบราว์เซอร์ของอุปกรณ์นี้</footer></section>
+      <section className="history-card"><div className="history-head"><div><div className="title-row"><span className="signal-dot" /><h2>ประวัติสิทธิ์วันเกิด</h2></div><p>ย้อนหลัง 10 วัน · แตะที่รูปเพื่อขยาย</p></div><div className="count-badge">{current.length} / 100 วันนี้</div></div>{entries.length === 0 ? <div className="empty-state"><img src={`${assetBase}assets/dna-pub-empty-state.webp`} alt="ยังไม่มีข้อมูล" /><strong>ยังไม่มีข้อมูลในรอบ 10 วัน</strong><p>เริ่มจากการถ่ายรูปหรือบันทึกเลขท้ายบัตรด้านบน</p></div> : <div className="entry-list">{entries.map((e) => <article className="entry-row" key={e.id}>{e.image ? <button className="thumb" onClick={() => setPreview(e.image!)}><img src={e.image} alt="ภาพหลักฐานวันเกิด" /></button> : <div className="thumb-placeholder"><Database size={17} /></div>}<div><strong>•••• {e.last4}</strong><p>{formatTime(e.createdAt)} น. · {e.createdAt.slice(0, 10)}</p></div><button className="delete" aria-label="ลบรายการ" onClick={() => setEntries((all) => all.filter((x) => x.id !== e.id))}><Trash2 size={16} /></button></article>)}</div>}<footer className="storage-note"><Sparkles size={15} />จัดเก็บภายในเบราว์เซอร์ของอุปกรณ์นี้</footer></section>
     </div>
     {preview && <div className="image-modal" role="dialog" aria-modal="true" onClick={() => setPreview(null)}><button onClick={() => setPreview(null)} aria-label="ปิด"><X /></button><img src={preview} alt="ภาพที่เลือก" onClick={(e) => e.stopPropagation()} /></div>}
   </main>;
