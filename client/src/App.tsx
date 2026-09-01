@@ -8,6 +8,13 @@ import Home from "./pages/Home";
 
 
 function Router() {
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
+  const isGitHubPagesPath = pathname === "/dna-pub-online";
+
+  if (isGitHubPagesPath) {
+    return <Home />;
+  }
+
   return (
     <Switch>
       <Route path={"/"} component={Home} />
