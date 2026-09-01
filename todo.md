@@ -1,10 +1,8 @@
-# งานเผยแพร่ GitHub Pages
+# งานซิงก์โค้ดขึ้น GitHub
 
-- [ ] ตั้งค่า Vite base path ให้ตรงกับชื่อ repository
-- [ ] เพิ่ม workflow สำหรับ build และ deploy GitHub Pages
-- [ ] ตรวจ production build และ asset URLs
-- [ ] สร้าง public repository dna-pub-online
-- [ ] push source และ workflow ขึ้น repository
-- [ ] ตรวจสถานะ GitHub Actions และ Pages deployment
-- [ ] เปิดลิงก์ HTTPS และทดสอบ mobile scroll กับการบันทึกข้อมูล
-- [ ] สรุปข้อจำกัดของโฮสต์ฟรีและ localStorage
+- [ ] ตรวจไฟล์ที่ต่างระหว่างโปรเจกต์กับ GitHub main
+- [ ] ตรวจว่าไม่มีไฟล์ลับหรือไฟล์ build/cache ที่ไม่ควรส่ง
+- [ ] ตรวจ TypeScript และ production build
+- [ ] อัปเดตไฟล์ source, style, config และเอกสารที่จำเป็น
+- [ ] ตรวจ commit ล่าสุดบน GitHub
+- [ ] ตรวจ workflow และ deployment หลังซิงก์

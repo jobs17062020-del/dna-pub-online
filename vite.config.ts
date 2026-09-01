@@ -205,8 +205,8 @@ function vitePluginStorageProxy(): Plugin {
 
 const plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector(), vitePluginStorageProxy()];
 
-export default defineConfig({
-  base: "/dna-pub-online/",
+export default defineConfig(({ mode }) => ({
+  base: process.env.GITHUB_ACTIONS ? "/dna-pub-online/" : "/",
   plugins,
   resolve: {
     alias: {
@@ -239,4 +239,4 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
-});
+}));
