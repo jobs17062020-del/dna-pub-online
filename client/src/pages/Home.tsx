@@ -41,6 +41,31 @@ const millisecondsUntilNextCycle = () => {
   return Math.max(1, next.getTime() - now.getTime());
 };
 const formatTime = (iso: string) => new Intl.DateTimeFormat("th-TH", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+let successAudioContext: AudioContext | null = null;
+const playSuccessSound = () => {
+  try {
+    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+    successAudioContext ||= new AudioContextClass();
+    const context = successAudioContext;
+    void context.resume();
+    const now = context.currentTime;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, now);
+    oscillator.frequency.setValueAtTime(1174.66, now + 0.12);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.32);
+  } catch {
+    // เสียงเป็นส่วนเสริม หากอุปกรณ์หรือเบราว์เซอร์ไม่รองรับให้ทำงานต่อได้ตามปกติ
+  }
+};
 const fingerprintImage = async (dataUrl: string) => {
   const raw = atob(dataUrl.split(",")[1] || "");
   const bytes = Uint8Array.from(raw, (char) => char.charCodeAt(0));
@@ -97,7 +122,7 @@ export default function Home() {
       }
     }
     const next = { id: crypto.randomUUID(), last5: value, image, imageHash: resolvedHash, createdAt: new Date().toISOString() };
-    setEntries((all) => [next, ...all]); setManual(""); setNotice(`บันทึกข้อมูลสำเร็จ เวลา ${formatTime(next.createdAt)} น.`); toast.success("บันทึกข้อมูลสำเร็จ");
+    setEntries((all) => [next, ...all]); setManual(""); setNotice(`บันทึกข้อมูลสำเร็จ เวลา ${formatTime(next.createdAt)} น.`); playSuccessSound(); toast.success("บันทึกข้อมูลสำเร็จ");
     window.setTimeout(() => setNotice(null), 4800);
     return true;
   };
