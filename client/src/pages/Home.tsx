@@ -3,6 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   Camera,
+  Cloud,
+  LogIn,
+  LogOut,
   Check,
   Clock3,
   Database,
@@ -19,6 +22,17 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  createCloudAccount,
+  isFirebaseConfigured,
+  loadCloudEntries,
+  saveCloudEntries,
+  signInCloud,
+  signOutCloud,
+  watchCloudAuth,
+  watchCloudEntries,
+} from "@/lib/firebaseSync";
+import type { User } from "firebase/auth";
 
 type Entry = { id: string; last5: string; legacy?: boolean; image?: string; imageHash?: string; createdAt: string };
 const STORAGE_KEY = "dna-pub-vip-records";
@@ -104,6 +118,12 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [manual, setManual] = useState("");
   const [notice, setNotice] = useState<string | null>(null);
+  const [cloudUser, setCloudUser] = useState<User | null>(null);
+  const [cloudEmail, setCloudEmail] = useState("");
+  const [cloudPassword, setCloudPassword] = useState("");
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [cloudReadyUid, setCloudReadyUid] = useState<string | null>(null);
+  const [cloudStatus, setCloudStatus] = useState(isFirebaseConfigured ? "พร้อมเชื่อมต่อ Cloud" : "ยังไม่ได้ตั้งค่า Firebase");
   const [preview, setPreview] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -124,6 +144,23 @@ export default function Home() {
     setHydrated(true);
   }, []);
   useEffect(() => { if (hydrated) localStorage.setItem(STORAGE_KEY, JSON.stringify(entries)); }, [entries, hydrated]);
+  useEffect(() => watchCloudAuth(setCloudUser), []);
+  useEffect(() => {
+    if (!cloudUser) return undefined;
+    return watchCloudEntries(cloudUser, (cloudEntries) => {
+      if (cloudEntries.length === 0) { setCloudReadyUid(cloudUser.uid); setCloudStatus("Cloud พร้อมใช้งาน — ยังไม่มีข้อมูลบน Cloud"); return; }
+      setEntries((all) => {
+        const merged = mergeEntries(all, cloudEntries);
+        return JSON.stringify(merged) === JSON.stringify(all) ? all : merged;
+      });
+      setCloudReadyUid(cloudUser.uid);
+      setCloudStatus(`ซิงค์ Cloud แล้ว ${cloudEntries.length} รายการ`);
+    });
+  }, [cloudUser]);
+  useEffect(() => {
+    if (!hydrated || !cloudUser || cloudReadyUid !== cloudUser.uid) return;
+    saveCloudEntries(cloudUser, entries).then(() => setCloudStatus("สำรองข้อมูลขึ้น Cloud แล้ว")).catch(() => setCloudStatus("ซิงค์ Cloud ไม่สำเร็จ — ข้อมูลในเครื่องยังอยู่"));
+  }, [entries, hydrated, cloudUser, cloudReadyUid]);
   useEffect(() => {
     let timeout: number | undefined;
     const scheduleNextCycle = () => {
@@ -184,6 +221,38 @@ export default function Home() {
     reader.onerror = () => toast.error("กู้คืนไม่สำเร็จ: อ่านไฟล์ไม่ได้");
     reader.readAsText(file);
   };
+  const connectCloud = async (mode: "login" | "register") => {
+    if (!isFirebaseConfigured) { toast.error("ยังไม่ได้ตั้งค่า Firebase ในโปรเจกต์"); return; }
+    if (!cloudEmail || cloudPassword.length < 6) { toast.error("กรุณากรอกอีเมลและรหัสผ่านอย่างน้อย 6 ตัวอักษร"); return; }
+    setCloudBusy(true);
+    try {
+      if (mode === "register") await createCloudAccount(cloudEmail, cloudPassword);
+      else await signInCloud(cloudEmail, cloudPassword);
+      setCloudPassword("");
+      toast.success("เชื่อมต่อ Cloud สำเร็จ");
+    } catch { toast.error(mode === "register" ? "สร้างบัญชีไม่สำเร็จ หรืออีเมลนี้มีอยู่แล้ว" : "เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบอีเมลและรหัสผ่าน"); }
+    finally { setCloudBusy(false); }
+  };
+  const backupToCloud = async () => {
+    if (!cloudUser) { toast.error("กรุณาเข้าสู่ระบบ Cloud ก่อน"); return; }
+    setCloudBusy(true);
+    try { await saveCloudEntries(cloudUser, entries); setCloudReadyUid(cloudUser.uid); setCloudStatus(`สำรองข้อมูลขึ้น Cloud แล้ว ${entries.length} รายการ`); toast.success("สำรองข้อมูลขึ้น Cloud แล้ว"); }
+    catch { toast.error("สำรองขึ้น Cloud ไม่สำเร็จ แต่ข้อมูลในเครื่องยังอยู่"); }
+    finally { setCloudBusy(false); }
+  };
+  const restoreFromCloud = async () => {
+    if (!cloudUser) { toast.error("กรุณาเข้าสู่ระบบ Cloud ก่อน"); return; }
+    setCloudBusy(true);
+    try {
+      const cloudEntries = await loadCloudEntries(cloudUser);
+      if (cloudEntries.length === 0) { toast.info("ยังไม่มีข้อมูลบน Cloud"); return; }
+      setEntries((all) => mergeEntries(cloudEntries, all));
+      setCloudReadyUid(cloudUser.uid);
+      setCloudStatus(`กู้คืนจาก Cloud แล้ว ${cloudEntries.length} รายการ`);
+      toast.success(`กู้คืนจาก Cloud แล้ว ${cloudEntries.length} รายการ`);
+    } catch { toast.error("กู้คืนจาก Cloud ไม่สำเร็จ แต่ข้อมูลในเครื่องยังอยู่"); }
+    finally { setCloudBusy(false); }
+  };
   const exportImage = () => { const c = document.createElement("canvas"); c.width = 1200; c.height = 630; const x = c.getContext("2d")!; x.fillStyle = "#0b1026"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#5de4c7"; x.font = "700 28px sans-serif"; x.fillText("DNA PUB · VIP 10-DAYS TRACKER", 70, 90); x.fillStyle = "#f8fafc"; x.font = "800 72px monospace"; x.fillText(`${current.length} / 100`, 70, 220); x.font = "400 28px sans-serif"; x.fillStyle = "#b8c2dc"; x.fillText(`บันทึกในรอบนี้ · ${today}`, 70, 275); c.toBlob((b) => b && download(b, `dna-pub-${today}.png`, "image/png")); };
   const share = async () => { const text = `DNA PUB\nบันทึกแล้ว ${current.length}/100 เคส\nรอบวันที่ ${today}`; if (navigator.share) await navigator.share({ title: "DNA PUB", text }); else { await navigator.clipboard.writeText(text); toast.success("คัดลอกสรุปข้อมูลแล้ว"); } };
 
@@ -194,6 +263,8 @@ export default function Home() {
         <div className="brand-lockup"><div className="brand-mark"><img src={`${assetBase}assets/dna-pub-mark.png`} alt="DNA PUB" /></div><div><div className="eyebrow"><span className="signal-dot" /> DNA VIP DATABASE</div><h1>DNA PUB</h1><p>ระบบตรวจสอบสิทธิ์วันเกิด · รอบละ 10 วัน</p></div></div>
         <div className="privacy-pill"><LockKeyhole size={15} />ข้อมูลอยู่ในเครื่องนี้<br /><strong>ไม่ส่งออกอัตโนมัติ</strong></div>
       </header>
+
+      <section className="backup-panel cloud-panel"><div className="panel-heading"><div className="panel-icon"><Cloud size={19} /></div><div><div className="section-kicker">CLOUD BACKUP · FIREBASE</div><p>{cloudUser ? `เชื่อมต่อแล้ว: ${cloudUser.email || "บัญชี Cloud"}` : cloudStatus}</p></div><div className="backup-readout">{cloudUser ? "SYNC" : "LOCAL"}<br /><strong>{cloudUser ? "ONLINE" : "READY"}</strong></div></div>{cloudUser ? <div className="backup-actions"><button onClick={backupToCloud} disabled={cloudBusy}><Cloud size={16} />สำรองขึ้น Cloud</button><button onClick={restoreFromCloud} disabled={cloudBusy}><Download size={16} />กู้คืนจาก Cloud</button><button onClick={() => signOutCloud()} disabled={cloudBusy}><LogOut size={16} />ออกจากระบบ</button></div> : isFirebaseConfigured ? <form className="cloud-login-form" onSubmit={(e) => { e.preventDefault(); void connectCloud("login"); }}><input type="email" value={cloudEmail} onChange={(e) => setCloudEmail(e.target.value)} placeholder="อีเมล" aria-label="อีเมล Firebase" /><input type="password" value={cloudPassword} onChange={(e) => setCloudPassword(e.target.value)} placeholder="รหัสผ่านอย่างน้อย 6 ตัว" aria-label="รหัสผ่าน Firebase" /><button type="submit" disabled={cloudBusy}><LogIn size={16} />เข้าสู่ระบบ</button><button type="button" onClick={() => void connectCloud("register")} disabled={cloudBusy}>สร้างบัญชี</button></form> : <p>ตั้งค่า Firebase ก่อนใช้งาน Cloud โดยระบบในเครื่องยังทำงานได้ตามปกติ</p>}</section>
 
       <section className="hero-grid">
         <section className="scan-card">

@@ -1,0 +1,11 @@
+{
+  "rules": {
+    "workspaces": {
+      "$workspaceId": {
+        ".read": "auth != null",
+        ".write": "auth != null && newData.child('updatedBy').val() == auth.uid",
+        ".validate": "newData.hasChildren(['entries', 'updatedAt', 'updatedBy']) && newData.child('entries').isArray() && newData.child('entries').val().length <= 10000"
+      }
+    }
+  }
+}
