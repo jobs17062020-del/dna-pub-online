@@ -20,11 +20,33 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-type Entry = { id: string; last5: string; image?: string; imageHash?: string; createdAt: string };
-const STORAGE_KEY = "dna-pub-vip-records-v3";
+type Entry = { id: string; last5: string; legacy?: boolean; image?: string; imageHash?: string; createdAt: string };
+const STORAGE_KEY = "dna-pub-vip-records";
+const LEGACY_STORAGE_KEYS = ["dna-pub-vip-records-v3", "dna-pub-vip-records-v2"];
+const BACKUP_STORAGE_KEY = "dna-pub-vip-records-backup";
 const RETENTION_WINDOW_MS = 100 * 24 * 60 * 60 * 1000;
 const assetBase = import.meta.env.BASE_URL;
 const isWithinRetention = (entry: Entry) => Date.now() - new Date(entry.createdAt).getTime() <= RETENTION_WINDOW_MS;
+const normalizeEntries = (raw: unknown, forceLegacy = false): Entry[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const source = item as Record<string, unknown>;
+    const sourceLast5 = typeof source.last5 === "string" ? source.last5 : typeof source.last4 === "string" ? source.last4 : "";
+    const last5 = sourceLast5.replace(/\D/g, "");
+    const createdAt = typeof source.createdAt === "string" ? source.createdAt : "";
+    if (!last5 || !createdAt || Number.isNaN(new Date(createdAt).getTime())) return [];
+    return [{
+      id: typeof source.id === "string" ? source.id : crypto.randomUUID(),
+      last5: last5.slice(-5),
+      legacy: forceLegacy || source.last5 === undefined || source.legacy === true,
+      image: typeof source.image === "string" ? source.image : undefined,
+      imageHash: typeof source.imageHash === "string" ? source.imageHash : undefined,
+      createdAt,
+    }];
+  });
+};
+const mergeEntries = (...groups: Entry[][]) => Array.from(new Map(groups.flat().map((entry) => [entry.id, entry])).values());
 const cycleKey = (value: Date = new Date()) => {
   const cycleDate = new Date(value);
   if (cycleDate.getHours() < 6) cycleDate.setDate(cycleDate.getDate() - 1);
@@ -85,12 +107,19 @@ export default function Home() {
   const [preview, setPreview] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const backupRef = useRef<HTMLInputElement>(null);
   const [today, setToday] = useState(cycleKey);
 
   useEffect(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]") as Entry[];
-      setEntries(stored.filter(isWithinRetention));
+      const currentEntries = normalizeEntries(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+      const legacyEntries = LEGACY_STORAGE_KEYS.flatMap((key) => normalizeEntries(JSON.parse(localStorage.getItem(key) || "[]"), key.endsWith("v2")));
+      const merged = mergeEntries(currentEntries, legacyEntries);
+      if (legacyEntries.length > 0) {
+        localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), entries: merged }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      }
+      setEntries(merged.filter(isWithinRetention));
     } catch { setEntries([]); }
     setHydrated(true);
   }, []);
@@ -138,8 +167,23 @@ export default function Home() {
       if (found.length === 5) await addEntry(found, image, imageHash); else { setPreview(image); toast.info("อ่านเลขไม่ครบ กรุณาตรวจสอบแล้วกรอกเลข 5 ตัวท้ายด้วยตนเอง"); }
     } catch { toast.error("เกิดข้อผิดพลาด: ไม่สามารถอ่านหรือประมวลผลภาพนี้ได้"); }
   };
-  const exportCsv = () => download(["เลข 5 ตัวท้าย,เวลา\n", ...recent.map((e) => `${e.last5},${new Date(e.createdAt).toLocaleString("th-TH")}`)].join("\n"), `dna-pub-${today}.csv`, "text/csv;charset=utf-8");
+  const exportCsv = () => download(["เลขท้าย,เวลา\n", ...recent.map((e) => `${e.last5},${new Date(e.createdAt).toLocaleString("th-TH")}`)].join("\n"), `dna-pub-${today}.csv`, "text/csv;charset=utf-8");
   const exportJson = () => download(JSON.stringify(recent, null, 2), `dna-pub-${today}.json`, "application/json");
+  const exportBackup = () => download(JSON.stringify({ app: "DNA PUB", version: 3, exportedAt: new Date().toISOString(), entries }, null, 2), `dna-pub-backup-${today}.json`, "application/json");
+  const restoreBackup = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const payload = JSON.parse(String(reader.result));
+        const imported = normalizeEntries(Array.isArray(payload) ? payload : payload.entries);
+        if (imported.length === 0) throw new Error("empty");
+        setEntries((all) => mergeEntries(imported, all));
+        toast.success(`กู้คืนข้อมูลแล้ว ${imported.length} รายการ`);
+      } catch { toast.error("กู้คืนไม่สำเร็จ: ไฟล์สำรองไม่ถูกต้อง"); }
+    };
+    reader.onerror = () => toast.error("กู้คืนไม่สำเร็จ: อ่านไฟล์ไม่ได้");
+    reader.readAsText(file);
+  };
   const exportImage = () => { const c = document.createElement("canvas"); c.width = 1200; c.height = 630; const x = c.getContext("2d")!; x.fillStyle = "#0b1026"; x.fillRect(0, 0, c.width, c.height); x.fillStyle = "#5de4c7"; x.font = "700 28px sans-serif"; x.fillText("DNA PUB · VIP 10-DAYS TRACKER", 70, 90); x.fillStyle = "#f8fafc"; x.font = "800 72px monospace"; x.fillText(`${current.length} / 100`, 70, 220); x.font = "400 28px sans-serif"; x.fillStyle = "#b8c2dc"; x.fillText(`บันทึกในรอบนี้ · ${today}`, 70, 275); c.toBlob((b) => b && download(b, `dna-pub-${today}.png`, "image/png")); };
   const share = async () => { const text = `DNA PUB\nบันทึกแล้ว ${current.length}/100 เคส\nรอบวันที่ ${today}`; if (navigator.share) await navigator.share({ title: "DNA PUB", text }); else { await navigator.clipboard.writeText(text); toast.success("คัดลอกสรุปข้อมูลแล้ว"); } };
 
@@ -162,9 +206,9 @@ export default function Home() {
 
       <section className="manual-panel"><div className="panel-heading"><div className="panel-icon"><ScanLine size={19} /></div><div><div className="section-kicker">02 · MANUAL FALLBACK</div><p>กรณีไม่ต้องการถ่ายรูป ให้พิมพ์เลข 5 ตัวท้าย</p></div></div><form onSubmit={async (e) => { e.preventDefault(); await addEntry(manual); }}><input value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" maxLength={5} placeholder="เช่น 12345" aria-label="เลข 5 ตัวท้ายบัตร" /><button type="submit"><Check size={17} />บันทึกมือ</button></form></section>
 
-      <section className="backup-panel"><div className="panel-heading"><div className="panel-icon"><Archive size={19} /></div><div><div className="section-kicker">03 · FREE BACKUP</div><p>ดาวน์โหลดไปเก็บใน Google Drive หรือเปิด CSV ด้วย Google Sheets</p></div><div className="backup-readout">LOCAL<br /><strong>READY</strong></div></div><div className="backup-actions"><button onClick={exportCsv}><FileSpreadsheet size={16} />CSV / Sheets</button><button onClick={exportJson}><FileJson size={16} />JSON</button><button onClick={exportImage}><ImageIcon size={16} />รูปภาพ</button><button onClick={share}><Share2 size={16} />แชร์ข้อมูล</button></div></section>
+      <section className="backup-panel"><div className="panel-heading"><div className="panel-icon"><Archive size={19} /></div><div><div className="section-kicker">03 · FREE BACKUP</div><p>สำรองข้อมูลไว้ก่อนอัปเดต หรือดาวน์โหลดไปเก็บใน Google Drive</p></div><div className="backup-readout">LOCAL<br /><strong>READY</strong></div></div><div className="backup-actions"><button onClick={exportBackup}><Download size={16} />สำรองข้อมูล</button><button onClick={() => backupRef.current?.click()}><Upload size={16} />กู้คืนข้อมูล</button><button onClick={exportCsv}><FileSpreadsheet size={16} />CSV / Sheets</button><button onClick={exportJson}><FileJson size={16} />JSON</button><button onClick={exportImage}><ImageIcon size={16} />รูปภาพ</button><button onClick={share}><Share2 size={16} />แชร์ข้อมูล</button></div><input ref={backupRef} type="file" accept="application/json,.json" onChange={(e) => { const file = e.target.files?.[0]; if (file) restoreBackup(file); e.currentTarget.value = ""; }} /></section>
 
-      <section className="history-card"><div className="history-head"><div><div className="title-row"><span className="signal-dot" /><h2>ประวัติสิทธิ์วันเกิด</h2></div><p>ย้อนหลัง 100 วัน · แตะที่รูปเพื่อขยาย</p></div><div className="count-badge">{current.length} / 100 วันนี้</div></div>{recent.length === 0 ? <div className="empty-state"><img src={`${assetBase}assets/dna-pub-empty-state.webp`} alt="ยังไม่มีข้อมูล" /><strong>ยังไม่มีข้อมูลย้อนหลัง 100 วัน</strong><p>เริ่มจากการถ่ายรูปหรือบันทึกเลขท้ายบัตรด้านบน</p></div> : <div className="entry-list">{recent.map((e) => <article className="entry-row" key={e.id}>{e.image ? <button className="thumb" onClick={() => setPreview(e.image!)}><img src={e.image} alt="ภาพหลักฐานวันเกิด" /></button> : <div className="thumb-placeholder"><Database size={17} /></div>}<div><strong>••••• {e.last5}</strong><p>{formatTime(e.createdAt)} น. · {e.createdAt.slice(0, 10)}</p></div><button className="delete" aria-label={`ลบรายการเลข ${e.last5}`} onClick={() => { if (window.confirm(`ยืนยันการลบรายการเลข ${e.last5} ใช่หรือไม่?`)) { setEntries((all) => all.filter((x) => x.id !== e.id)); toast.success("ลบรายการแล้ว"); } else toast.info("ยกเลิกการลบแล้ว"); }}><Trash2 size={16} /></button></article>)}</div>}<footer className="storage-note"><Sparkles size={15} />จัดเก็บภายในเบราว์เซอร์ของอุปกรณ์นี้ · ตรวจซ้ำย้อนหลัง 100 วัน</footer></section>
+      <section className="history-card"><div className="history-head"><div><div className="title-row"><span className="signal-dot" /><h2>ประวัติสิทธิ์วันเกิด</h2></div><p>ย้อนหลัง 100 วัน · แตะที่รูปเพื่อขยาย</p></div><div className="count-badge">{current.length} / 100 วันนี้</div></div>{recent.length === 0 ? <div className="empty-state"><img src={`${assetBase}assets/dna-pub-empty-state.webp`} alt="ยังไม่มีข้อมูล" /><strong>ยังไม่มีข้อมูลย้อนหลัง 100 วัน</strong><p>เริ่มจากการถ่ายรูปหรือบันทึกเลขท้ายบัตรด้านบน</p></div> : <div className="entry-list">{recent.map((e) => <article className="entry-row" key={e.id}>{e.image ? <button className="thumb" onClick={() => setPreview(e.image!)}><img src={e.image} alt="ภาพหลักฐานวันเกิด" /></button> : <div className="thumb-placeholder"><Database size={17} /></div>}<div><strong>{e.legacy ? "••••" : "•••••"} {e.last5}</strong><p>{formatTime(e.createdAt)} น. · {e.createdAt.slice(0, 10)}</p></div><button className="delete" aria-label={`ลบรายการเลข ${e.last5}`} onClick={() => { if (window.confirm(`ยืนยันการลบรายการเลข ${e.last5} ใช่หรือไม่?`)) { setEntries((all) => all.filter((x) => x.id !== e.id)); toast.success("ลบรายการแล้ว"); } else toast.info("ยกเลิกการลบแล้ว"); }}><Trash2 size={16} /></button></article>)}</div>}<footer className="storage-note"><Sparkles size={15} />จัดเก็บภายในเบราว์เซอร์ของอุปกรณ์นี้ · ตรวจซ้ำย้อนหลัง 100 วัน</footer></section>
     </div>
     {preview && <div className="image-modal" role="dialog" aria-modal="true" onClick={() => setPreview(null)}><button onClick={() => setPreview(null)} aria-label="ปิด"><X /></button><img src={preview} alt="ภาพที่เลือก" onClick={(e) => e.stopPropagation()} /></div>}
   </main>;
