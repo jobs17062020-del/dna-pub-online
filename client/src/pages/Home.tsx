@@ -61,6 +61,19 @@ const normalizeEntries = (raw: unknown, forceLegacy = false): Entry[] => {
   });
 };
 const mergeEntries = (...groups: Entry[][]) => Array.from(new Map(groups.flat().map((entry) => [entry.id, entry])).values());
+const sortEntries = (items: Entry[]) => [...items].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+const parseImportedDate = (value: string) => {
+  const text = value.trim();
+  const match = text.match(/^(\d{1,2})[\\/-](\d{1,2})[\\/-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  if (match) {
+    const [, day, month, rawYear, hour = "00", minute = "00", second = "00"] = match;
+    const year = Number(rawYear) > 2400 ? Number(rawYear) - 543 : Number(rawYear);
+    const date = new Date(year, Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+    if (!Number.isNaN(date.getTime())) return date.toISOString();
+  }
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? "" : parsed.toISOString();
+};
 const cycleKey = (value: Date = new Date()) => {
   const cycleDate = new Date(value);
   if (cycleDate.getHours() < 6) cycleDate.setDate(cycleDate.getDate() - 1);
@@ -128,6 +141,7 @@ export default function Home() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const backupRef = useRef<HTMLInputElement>(null);
+  const csvRef = useRef<HTMLInputElement>(null);
   const [today, setToday] = useState(cycleKey);
 
   useEffect(() => {
@@ -139,7 +153,7 @@ export default function Home() {
         localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), entries: merged }));
         localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       }
-      setEntries(merged.filter(isWithinRetention));
+      setEntries(sortEntries(merged.filter(isWithinRetention)));
     } catch { setEntries([]); }
     setHydrated(true);
   }, []);
@@ -188,7 +202,7 @@ export default function Home() {
       }
     }
     const next = { id: crypto.randomUUID(), last5: value, image, imageHash: resolvedHash, createdAt: new Date().toISOString() };
-    setEntries((all) => [next, ...all]); setManual(""); setNotice(`บันทึกข้อมูลสำเร็จ เวลา ${formatTime(next.createdAt)} น.`); playSuccessSound(); toast.success("บันทึกข้อมูลสำเร็จ");
+    setEntries((all) => sortEntries([next, ...all])); setManual(""); setNotice(`บันทึกข้อมูลสำเร็จ เวลา ${formatTime(next.createdAt)} น.`); playSuccessSound(); toast.success("บันทึกข้อมูลสำเร็จ");
     window.setTimeout(() => setNotice(null), 4800);
     return true;
   };
@@ -204,7 +218,29 @@ export default function Home() {
       if (found.length === 5) await addEntry(found, image, imageHash); else { setPreview(image); toast.info("อ่านเลขไม่ครบ กรุณาตรวจสอบแล้วกรอกเลข 5 ตัวท้ายด้วยตนเอง"); }
     } catch { toast.error("เกิดข้อผิดพลาด: ไม่สามารถอ่านหรือประมวลผลภาพนี้ได้"); }
   };
-  const exportCsv = () => download(["เลขท้าย,เวลา\n", ...recent.map((e) => `${e.last5},${new Date(e.createdAt).toLocaleString("th-TH")}`)].join("\n"), `dna-pub-${today}.csv`, "text/csv;charset=utf-8");
+  const exportCsv = () => download(["เลข 5 ตัวท้าย,เวลา\n", ...sortEntries(recent).map((e) => `${e.last5},${new Date(e.createdAt).toLocaleString("th-TH")}`)].join("\n"), `dna-pub-${today}.csv`, "text/csv;charset=utf-8");
+  const importCsv = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const lines = String(reader.result).replace(/^\uFEFF/, "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+        const imported: Entry[] = lines.slice(1).flatMap((line, index) => {
+          const columns = line.split(/[,\t;]/).map((part) => part.trim().replace(/^"|"$/g, ""));
+          const last5 = (columns[0] || "").replace(/\D/g, "").slice(-5);
+          const createdAt = parseImportedDate(columns.slice(1).join(" "));
+          if (last5.length !== 5 || !createdAt) return [];
+          return [{ id: `csv-${createdAt}-${last5}-${index}`, last5, legacy: false, createdAt }];
+        });
+        if (imported.length === 0) throw new Error("empty");
+        const beforeImport = sortEntries(entries);
+        localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), entries: beforeImport }));
+        setEntries((all) => sortEntries(mergeEntries(all, imported)));
+        toast.success(`นำเข้า CSV สำเร็จ ${imported.length} รายการ และเก็บข้อมูลเดิมไว้แล้ว`);
+      } catch { toast.error("นำเข้าไม่สำเร็จ: ตรวจสอบหัวตารางและรูปแบบเลข/วันเวลาใน CSV"); }
+    };
+    reader.onerror = () => toast.error("นำเข้าไม่สำเร็จ: อ่านไฟล์ไม่ได้");
+    reader.readAsText(file, "UTF-8");
+  };
   const exportJson = () => download(JSON.stringify(recent, null, 2), `dna-pub-${today}.json`, "application/json");
   const exportBackup = () => download(JSON.stringify({ app: "DNA PUB", version: 3, exportedAt: new Date().toISOString(), entries }, null, 2), `dna-pub-backup-${today}.json`, "application/json");
   const restoreBackup = (file: File) => {
@@ -214,7 +250,8 @@ export default function Home() {
         const payload = JSON.parse(String(reader.result));
         const imported = normalizeEntries(Array.isArray(payload) ? payload : payload.entries);
         if (imported.length === 0) throw new Error("empty");
-        setEntries((all) => mergeEntries(imported, all));
+        localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({ version: 1, savedAt: new Date().toISOString(), entries: sortEntries(entries) }));
+        setEntries((all) => sortEntries(mergeEntries(imported, all)));
         toast.success(`กู้คืนข้อมูลแล้ว ${imported.length} รายการ`);
       } catch { toast.error("กู้คืนไม่สำเร็จ: ไฟล์สำรองไม่ถูกต้อง"); }
     };
@@ -277,9 +314,9 @@ export default function Home() {
 
       <section className="manual-panel"><div className="panel-heading"><div className="panel-icon"><ScanLine size={19} /></div><div><div className="section-kicker">02 · MANUAL FALLBACK</div><p>กรณีไม่ต้องการถ่ายรูป ให้พิมพ์เลข 5 ตัวท้าย</p></div></div><form onSubmit={async (e) => { e.preventDefault(); await addEntry(manual); }}><input value={manual} onChange={(e) => setManual(e.target.value.replace(/\D/g, "").slice(0, 5))} inputMode="numeric" maxLength={5} placeholder="เช่น 12345" aria-label="เลข 5 ตัวท้ายบัตร" /><button type="submit"><Check size={17} />บันทึกมือ</button></form></section>
 
-      <section className="backup-panel"><div className="panel-heading"><div className="panel-icon"><Archive size={19} /></div><div><div className="section-kicker">03 · FREE BACKUP</div><p>สำรองข้อมูลไว้ก่อนอัปเดต หรือดาวน์โหลดไปเก็บใน Google Drive</p></div><div className="backup-readout">LOCAL<br /><strong>READY</strong></div></div><div className="backup-actions"><button onClick={exportBackup}><Download size={16} />สำรองข้อมูล</button><button onClick={() => backupRef.current?.click()}><Upload size={16} />กู้คืนข้อมูล</button><button onClick={exportCsv}><FileSpreadsheet size={16} />CSV / Sheets</button><button onClick={exportJson}><FileJson size={16} />JSON</button><button onClick={exportImage}><ImageIcon size={16} />รูปภาพ</button><button onClick={share}><Share2 size={16} />แชร์ข้อมูล</button></div><input ref={backupRef} type="file" accept="application/json,.json" onChange={(e) => { const file = e.target.files?.[0]; if (file) restoreBackup(file); e.currentTarget.value = ""; }} /></section>
+      <section className="backup-panel"><div className="panel-heading"><div className="panel-icon"><Archive size={19} /></div><div><div className="section-kicker">03 · FREE BACKUP</div><p>สำรองข้อมูลไว้ก่อนอัปเดต หรือดาวน์โหลดไปเก็บใน Google Drive</p></div><div className="backup-readout">LOCAL<br /><strong>READY</strong></div></div><div className="backup-actions"><button onClick={exportBackup}><Download size={16} />สำรองข้อมูล</button><button onClick={() => backupRef.current?.click()}><Upload size={16} />กู้คืนข้อมูล</button><button onClick={() => csvRef.current?.click()}><FileSpreadsheet size={16} />นำเข้า CSV</button><button onClick={exportCsv}><FileSpreadsheet size={16} />CSV / Sheets</button><button onClick={exportJson}><FileJson size={16} />JSON</button><button onClick={exportImage}><ImageIcon size={16} />รูปภาพ</button><button onClick={share}><Share2 size={16} />แชร์ข้อมูล</button></div><input ref={backupRef} type="file" accept="application/json,.json" onChange={(e) => { const file = e.target.files?.[0]; if (file) restoreBackup(file); e.currentTarget.value = ""; }} /><input ref={csvRef} type="file" accept="text/csv,.csv,text/plain" onChange={(e) => { const file = e.target.files?.[0]; if (file) importCsv(file); e.currentTarget.value = ""; }} /></section>
 
-      <section className="history-card"><div className="history-head"><div><div className="title-row"><span className="signal-dot" /><h2>ประวัติสิทธิ์วันเกิด</h2></div><p>ย้อนหลัง 100 วัน · แตะที่รูปเพื่อขยาย</p></div><div className="count-badge">{current.length} / 100 วันนี้</div></div>{recent.length === 0 ? <div className="empty-state"><img src={`${assetBase}assets/dna-pub-empty-state.webp`} alt="ยังไม่มีข้อมูล" /><strong>ยังไม่มีข้อมูลย้อนหลัง 100 วัน</strong><p>เริ่มจากการถ่ายรูปหรือบันทึกเลขท้ายบัตรด้านบน</p></div> : <div className="entry-list">{recent.map((e) => <article className="entry-row" key={e.id}>{e.image ? <button className="thumb" onClick={() => setPreview(e.image!)}><img src={e.image} alt="ภาพหลักฐานวันเกิด" /></button> : <div className="thumb-placeholder"><Database size={17} /></div>}<div><strong>{e.legacy ? "••••" : "•••••"} {e.last5}</strong><p>{formatTime(e.createdAt)} น. · {e.createdAt.slice(0, 10)}</p></div><button className="delete" aria-label={`ลบรายการเลข ${e.last5}`} onClick={() => { if (window.confirm(`ยืนยันการลบรายการเลข ${e.last5} ใช่หรือไม่?`)) { setEntries((all) => all.filter((x) => x.id !== e.id)); toast.success("ลบรายการแล้ว"); } else toast.info("ยกเลิกการลบแล้ว"); }}><Trash2 size={16} /></button></article>)}</div>}<footer className="storage-note"><Sparkles size={15} />จัดเก็บภายในเบราว์เซอร์ของอุปกรณ์นี้ · ตรวจซ้ำย้อนหลัง 100 วัน</footer></section>
+      <section className="history-card"><div className="history-head"><div><div className="title-row"><span className="signal-dot" /><h2>ประวัติสิทธิ์วันเกิด</h2></div><p>ย้อนหลัง 100 วัน · แตะที่รูปเพื่อขยาย</p></div><div className="count-badge">{current.length} / 100 วันนี้</div></div>{recent.length === 0 ? <div className="empty-state"><img src={`${assetBase}assets/dna-pub-empty-state.webp`} alt="ยังไม่มีข้อมูล" /><strong>ยังไม่มีข้อมูลย้อนหลัง 100 วัน</strong><p>เริ่มจากการถ่ายรูปหรือบันทึกเลขท้ายบัตรด้านบน</p></div> : <div className="entry-list">{sortEntries(recent).map((e) => <article className="entry-row" key={e.id}>{e.image ? <button className="thumb" onClick={() => setPreview(e.image!)}><img src={e.image} alt="ภาพหลักฐานวันเกิด" /></button> : <div className="thumb-placeholder"><Database size={17} /></div>}<div><strong>{e.legacy ? "••••" : "•••••"} {e.last5}</strong><p>{formatTime(e.createdAt)} น. · {e.createdAt.slice(0, 10)}</p></div><button className="delete" aria-label={`ลบรายการเลข ${e.last5}`} onClick={() => { if (window.confirm(`ยืนยันการลบรายการเลข ${e.last5} ใช่หรือไม่?`)) { setEntries((all) => all.filter((x) => x.id !== e.id)); toast.success("ลบรายการแล้ว"); } else toast.info("ยกเลิกการลบแล้ว"); }}><Trash2 size={16} /></button></article>)}</div>}<footer className="storage-note"><Sparkles size={15} />จัดเก็บภายในเบราว์เซอร์ของอุปกรณ์นี้ · ตรวจซ้ำย้อนหลัง 100 วัน</footer></section>
     </div>
     {preview && <div className="image-modal" role="dialog" aria-modal="true" onClick={() => setPreview(null)}><button onClick={() => setPreview(null)} aria-label="ปิด"><X /></button><img src={preview} alt="ภาพที่เลือก" onClick={(e) => e.stopPropagation()} /></div>}
   </main>;
