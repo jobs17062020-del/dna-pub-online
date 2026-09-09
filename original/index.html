@@ -10,8 +10,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
-        body { 
-            font-family: 'Prompt', sans-serif; 
+        body {
+            font-family: 'Prompt', sans-serif;
             background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 100%);
         }
         .neon-glow {
@@ -58,7 +58,7 @@
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
     <label class="relative overflow-hidden w-full group glass-card rounded-2xl p-7 text-center cursor-pointer shadow-2xl flex flex-col items-center justify-center border border-indigo-500/30 transition-all duration-300 active:scale-95 mb-5">
         <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 opacity-40 group-hover:opacity-70 transition-opacity"></div>
-        
+
         <div class="relative z-10 flex flex-col items-center">
             <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40 mb-3 group-hover:scale-110 transition-transform duration-300">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -87,9 +87,10 @@
 
     <!-- คีย์มือกรณีฉุกเฉินหรือเช็กซ้ำ -->
     <div class="mb-5 glass-card p-4 rounded-2xl">
-        <p class="text-xs text-slate-400 mb-2 font-light">กรณีไม่ต้องการถ่ายรูป ให้พิมพ์ 4 ตัวท้ายตรงนี้:</p>
-        <div class="flex gap-2">
-            <input type="number" id="manualId" placeholder="เลข 4 ตัวท้ายบัตร" class="flex-1 px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all">
+        <p class="text-xs text-slate-400 mb-2 font-light">กรณีไม่ต้องการถ่ายรูป ให้พิมพ์เลข 5 ตัวท้ายและวันเกิด:</p>
+        <div class="flex gap-2 flex-wrap">
+            <input type="text" id="manualId" inputmode="numeric" maxlength="5" placeholder="เลข 5 ตัวท้าย" class="flex-1 min-w-[150px] px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all">
+            <input type="date" id="birthDate" class="flex-1 min-w-[150px] px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all" aria-label="วันเกิด">
             <button id="manualCheckBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 rounded-xl text-sm active:scale-95 transition-all">บันทึกมือ</button>
         </div>
     </div>
@@ -100,9 +101,9 @@
             <div class="flex flex-col">
                 <div class="flex items-center gap-2">
                     <span class="w-2 h-2 bg-pink-500 rounded-full animate-ping"></span>
-                    <h2 class="text-sm font-semibold tracking-wide text-slate-200">ประวัติสิทธิ์วันเกิด (ย้อนหลัง 10 วัน)</h2>
+                    <h2 class="text-sm font-semibold tracking-wide text-slate-200">ประวัติสิทธิ์วันเกิด (ย้อนหลัง 100 วัน)</h2>
                 </div>
-                <span class="text-[10px] text-slate-400 mt-0.5">*แตะที่รูปเพื่อขยายใหญ่อ่านข้อมูลได้ชัดเจน 100%</span>
+                <span class="text-[10px] text-slate-400 mt-0.5">*แตะที่รูปเพื่อขยายใหญ่อ่านข้อมูลได้ชัดเจน 100% · ตรวจย้อนหลัง 100 วัน</span>
             </div>
             <div class="text-right">
                 <span id="countBadge" class="bg-gradient-to-r from-pink-500 to-indigo-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">0 / 100 เคสวันนี้</span>
@@ -135,8 +136,9 @@
         const historyList = document.getElementById('historyList');
         const countBadge = document.getElementById('countBadge');
         const manualId = document.getElementById('manualId');
+        const birthDateInput = document.getElementById('birthDate');
         const manualCheckBtn = document.getElementById('manualCheckBtn');
-        
+
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
@@ -155,14 +157,33 @@
             return `${logicalDate.getFullYear()}-${logicalDate.getMonth() + 1}-${logicalDate.getDate()}`;
         };
 
-        // โหลดข้อมูล พร้อมกรองเคสที่เก่ากว่า 10 วัน (ทำงานแบบ Asynchronous สำหรับ IndexedDB)
+        const formatInputDate = (date) => {
+            const local = new Date(date);
+            return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`;
+        };
+
+        const validateBirthDate = (birthDate) => {
+            if (!birthDate) return { valid: false, message: 'กรุณาเลือกวันเกิดก่อนบันทึก' };
+            const [year, month, day] = birthDate.split('-').map(Number);
+            const selected = new Date(year, month - 1, day);
+            const today = new Date();
+            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const difference = Math.round((selected.getTime() - todayOnly.getTime()) / 86400000);
+            if (difference < -3 || difference > 3) {
+                return { valid: false, message: `วันเกิดเกินช่วงที่อนุญาต ต้องอยู่ระหว่าง ${formatInputDate(new Date(todayOnly.getTime() - 3 * 86400000))} ถึง ${formatInputDate(new Date(todayOnly.getTime() + 3 * 86400000))}` };
+            }
+            return { valid: true, message: '' };
+        };
+        birthDateInput.value = formatInputDate(new Date());
+
+        // โหลดข้อมูล พร้อมกรองเคสที่เก่ากว่า 100 วัน (ทำงานแบบ Asynchronous สำหรับ IndexedDB)
         const getCleanedHistory = async () => {
             let records = await localforage.getItem(STORAGE_KEY);
             if (!records) records = [];
-            
-            const tenDaysAgo = Date.now() - (10 * 24 * 60 * 60 * 1000);
-            const filtered = records.filter(item => item.timestamp > tenDaysAgo);
-            
+
+            const oneHundredDaysAgo = Date.now() - (100 * 24 * 60 * 60 * 1000);
+            const filtered = records.filter(item => item.timestamp > oneHundredDaysAgo);
+
             // เซฟข้อมูลที่คลีนแล้วกลับเข้าเครื่อง
             await localforage.setItem(STORAGE_KEY, filtered);
             return filtered;
@@ -189,15 +210,15 @@
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         // ขยาย Max Width เป็น 1600px เพื่อให้อ่านข้อความได้ชัดเจนสุดๆ
-                        const MAX_WIDTH = 1600; 
+                        const MAX_WIDTH = 1600;
                         let scaleSize = 1;
                         if (img.width > MAX_WIDTH) {
                             scaleSize = MAX_WIDTH / img.width;
                         }
-                        
+
                         canvas.width = img.width * scaleSize;
                         canvas.height = img.height * scaleSize;
-                        
+
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         // บันทึกที่คุณภาพ 90% (0.9) เพื่อให้ภาพคมกริบ
@@ -210,26 +231,26 @@
         // แสดงผลรายการประวัติหน้าร้าน
         const renderHistory = async () => {
             historyList.innerHTML = "<div class='text-center py-4'><div class='spinner mx-auto mb-2 w-6 h-6'></div><p class='text-xs text-indigo-300'>กำลังโหลดข้อมูล...</p></div>";
-            
+
             const history = await getCleanedHistory();
             const todayStr = getTodayShiftString();
-            
+
             // นับเฉพาะโควตาของวันเกิดในกะวันนี้
             const todayCount = history.filter(item => item.dateString === todayStr).length;
             countBadge.innerText = `${todayCount} / 100 เคสวันนี้`;
-            
+
             historyList.innerHTML = "";
             if (history.length === 0) {
-                historyList.innerHTML = "<li class='text-slate-500 text-center py-6 text-xs font-light tracking-wide'>ยังไม่มีข้อมูลบันทึกในรอบ 10 วัน</li>";
+                historyList.innerHTML = "<li class='text-slate-500 text-center py-6 text-xs font-light tracking-wide'>ยังไม่มีข้อมูลบันทึกในรอบ 100 วัน</li>";
                 return;
             }
-            
+
             // แสดงผลเรียงจากใหม่สุดไปเก่าสุด
             history.slice().reverse().forEach((item) => {
                 const li = document.createElement('li');
                 li.className = "bg-slate-900/60 p-2.5 rounded-xl flex justify-between items-center border border-slate-800 hover:bg-slate-900/90 transition-all";
-                
-                const imgTag = item.image 
+
+                const imgTag = item.image
                     ? `<img src="${item.image}" class="w-11 h-11 object-cover rounded-lg border border-slate-700 shadow-sm cursor-pointer active:scale-95 transition-transform" onclick="viewFullImage('${item.image}')">`
                     : `<div class="w-11 h-11 rounded-lg bg-slate-800 flex items-center justify-center border border-slate-700 text-[10px] text-slate-400">คีย์มือ</div>`;
 
@@ -241,7 +262,7 @@
                         ${imgTag}
                         <div class="min-w-0 flex-1">
                             <span class="text-slate-200 font-bold text-xs block truncate">${item.id}</span>
-                            <span class="text-[10px] text-slate-400">${formatThaiDate(item.timestamp)} • วันที่คีย์กะ: ${item.dateString}</span>
+                            <span class="text-[10px] text-slate-400">${formatThaiDate(item.timestamp)} • วันเกิด: ${item.birthDate || '-'} • วันที่คีย์กะ: ${item.dateString}</span>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -262,7 +283,7 @@
                 history = history.filter(item => item.timestamp !== timestamp);
                 await saveHistoryDirectly(history);
                 await renderHistory();
-                
+
                 resultBox.classList.add('hidden');
             }
         };
@@ -296,21 +317,30 @@
         });
 
         // ฟังก์ชันหลักในการตรวจสอบความซ้ำและบันทึกข้อมูล
-        const processAndAutoSave = async (idCode, base64Image = null) => {
+        const processAndAutoSave = async (idCode, base64Image = null, birthDate = formatInputDate(new Date())) => {
             loading.classList.add('hidden');
+            const birthValidation = validateBirthDate(birthDate);
+            if (!birthValidation.valid) {
+                resultBox.classList.remove('hidden');
+                resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
+                resultIcon.textContent = '⚠️';
+                resultText.textContent = 'วันเกิดไม่อยู่ในช่วงที่อนุญาต';
+                resultDetails.textContent = birthValidation.message;
+                return;
+            }
             resultBox.classList.remove('hidden', 'neon-border-green', 'bg-emerald-950/80', 'text-emerald-200', 'border-emerald-500/30', 'neon-border-red', 'bg-rose-950/80', 'text-rose-200', 'border-rose-500/30');
-            
+
             const history = await getCleanedHistory();
             const todayStr = getTodayShiftString();
 
             if (idCode !== "[สแกนภาพถ่ายวีไอพี]") {
                 const cleanInputCode = idCode.replace("ท้ายบัตร: ***", "").replace("คีย์มือ: ***", "");
                 const found = history.find(item => item.id.includes(cleanInputCode));
-                
+
                 if (found) {
                     resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
                     resultIcon.textContent = "🛑";
-                    resultText.textContent = "สิทธิ์ซ้ำ! เคยใช้ใน 10 วันนี้แล้ว";
+                    resultText.textContent = "สิทธิ์ซ้ำ! เคยใช้ใน 100 วันนี้แล้ว";
                     resultDetails.textContent = `เลขบัตรนี้ เคยทำรายการไปแล้วเมื่อวันที่ ${formatThaiDate(found.timestamp)} เวลา ${found.time} น.`;
                     return;
                 }
@@ -327,15 +357,16 @@
 
             const now = new Date();
             const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
-            
+
             history.push({
                 id: idCode,
                 timestamp: now.getTime(),
                 dateString: todayStr,
+                birthDate,
                 time: timeStr,
                 image: base64Image
             });
-            
+
             await saveHistoryDirectly(history);
             await renderHistory();
 
@@ -352,7 +383,7 @@
 
             resultBox.classList.add('hidden');
             loading.classList.remove('hidden');
-            
+
             try {
                 const base64Img = await compressImageFile(file);
 
@@ -363,8 +394,8 @@
                     const ret = await worker.recognize(file);
                     await worker.terminate();
                     const digits = ret.data.text.replace(/\D/g, '');
-                    if (digits.length >= 4) {
-                        detectedId = "ท้ายบัตร: ***" + digits.slice(-4);
+                    if (digits.length >= 5) {
+                        detectedId = "ท้ายบัตร: ***" + digits.slice(-5);
                     }
                 } catch(err) {
                     // ปล่อยผ่านกรณีสแกนข้อความไม่สำเร็จ
@@ -376,19 +407,20 @@
                 loading.classList.add('hidden');
                 alert("เกิดข้อผิดพลาดระหว่างจัดเก็บข้อมูล กรุณาลองใหม่อีกครั้งครับกัปตัน");
             } finally {
-                imageInput.value = ""; 
+                imageInput.value = "";
             }
         });
 
         // ตรวจจับปุ่มคีย์มือ
         manualCheckBtn.addEventListener('click', async () => {
-            const val = manualId.value.trim();
-            if (val.length < 1) {
-                alert("กรุณากรอกเลขท้ายบัตรประชาชนก่อนครับ");
+            const val = manualId.value.replace(/\D/g, '').slice(-5);
+            const selectedBirthDate = birthDateInput.value;
+            if (val.length !== 5) {
+                alert("กรุณากรอกเลข 5 ตัวท้ายให้ครบ");
                 return;
             }
-            const finalId = "คีย์มือ: ***" + val.slice(-4);
-            await processAndAutoSave(finalId, null);
+            const finalId = "คีย์มือ: ***" + val;
+            await processAndAutoSave(finalId, null, selectedBirthDate);
             manualId.value = "";
         });
 
