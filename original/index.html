@@ -53,7 +53,7 @@
             DNA PUB
         </h1>
         <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
-        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.1.0 · LOCAL SAFE</span>
+        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.2.0 · LOCAL SAFE</span>
     </div>
 
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
@@ -96,7 +96,21 @@
         </div>
     </div>
 
-    <!-- ประวัติย้อนหลัง 10 วัน -->
+    <!-- สำรองและถ่ายโอนข้อมูล -->
+    <div class="mb-5 glass-card p-4 rounded-2xl border border-emerald-500/20">
+        <div class="flex items-center justify-between gap-2 mb-2">
+            <p class="text-xs text-emerald-300 font-semibold">สำรอง / ส่งออก / นำเข้าข้อมูล</p>
+            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.2.0</span>
+        </div>
+        <p class="text-[10px] text-slate-400 mb-3">นำเข้าแล้วจะรวมกับข้อมูลเดิม ไม่ลบหรือเขียนทับรายการเดิม</p>
+        <div class="flex gap-2 flex-wrap">
+            <button id="exportJsonBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-2 rounded-xl text-xs active:scale-95 transition-all">สำรอง JSON</button>
+            <button id="exportCsvBtn" class="bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-2 rounded-xl text-xs active:scale-95 transition-all">ส่งออก CSV</button>
+            <label class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-2 rounded-xl text-xs active:scale-95 transition-all cursor-pointer">นำเข้า JSON/CSV<input id="importFile" type="file" accept="application/json,.json,text/csv,.csv,text/plain" class="hidden"></label>
+        </div>
+    </div>
+
+    <!-- ประวัติย้อนหลัง 100 วัน -->
     <div class="flex-1 glass-card rounded-t-3xl p-5 border-t border-slate-700/50 mt-auto shadow-inner">
         <div class="flex justify-between items-center mb-4">
             <div class="flex flex-col">
@@ -139,11 +153,14 @@
         const manualId = document.getElementById('manualId');
         const birthDateInput = document.getElementById('birthDate');
         const manualCheckBtn = document.getElementById('manualCheckBtn');
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+        const importFile = document.getElementById('importFile');
 
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
-        const APP_VERSION = '1.1.0';
+        const APP_VERSION = '1.2.0';
         const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
         const BACKUP_KEY = 'dna_vip_birthday_backup_v1';
 
@@ -199,6 +216,40 @@
         const saveHistoryDirectly = async (data) => {
             await localforage.setItem(STORAGE_KEY, data);
             await saveBackupSnapshot(data);
+        };
+
+        const downloadFile = (content, filename, mimeType) => {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(url);
+        };
+
+        const showTransferResult = (ok, title, detail) => {
+            resultBox.classList.remove('hidden', 'neon-border-green', 'bg-emerald-950/80', 'text-emerald-200', 'neon-border-red', 'bg-rose-950/80', 'text-rose-200');
+            resultBox.classList.add(ok ? 'neon-border-green' : 'neon-border-red', ok ? 'bg-emerald-950/80' : 'bg-rose-950/80', ok ? 'text-emerald-200' : 'text-rose-200');
+            resultIcon.textContent = ok ? '✅' : '⚠️';
+            resultText.textContent = title;
+            resultDetails.textContent = detail;
+        };
+
+        const exportJson = async () => {
+            const records = await getAllHistory();
+            const payload = { app: 'DNA PUB', version: APP_VERSION, exportedAt: new Date().toISOString(), records };
+            downloadFile(JSON.stringify(payload, null, 2), `dna-pub-backup-v${APP_VERSION}.json`, 'application/json');
+            showTransferResult(true, 'สำรองข้อมูล JSON สำเร็จ', `เวอร์ชัน ${APP_VERSION} · ${records.length} รายการ`);
+        };
+
+        const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+        const exportCsv = async () => {
+            const records = await getAllHistory();
+            const rows = [['id', 'timestamp', 'birthDate', 'dateString', 'time'], ...records.map(item => [item.id, item.timestamp, item.birthDate || '', item.dateString || '', item.time || ''])];
+            const csv = '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\n');
+            downloadFile(csv, `dna-pub-backup-v${APP_VERSION}.csv`, 'text/csv;charset=utf-8');
+            showTransferResult(true, 'ส่งออก CSV สำเร็จ', `เวอร์ชัน ${APP_VERSION} · ${records.length} รายการ`);
         };
 
         const formatThaiDate = (timestamp) => {
@@ -384,6 +435,75 @@
             resultText.textContent = "บันทึกข้อมูลสดสำเร็จ!";
             resultDetails.textContent = `ข้อมูลถูกบันทึกเรียบร้อย ปลอดภัย 100% (เวลา ${timeStr} น.)`;
         };
+
+        const normalizeImportedRecords = (rawRecords) => {
+            if (!Array.isArray(rawRecords)) return [];
+            return rawRecords.flatMap((item) => {
+                if (!item || typeof item !== 'object') return [];
+                const id = String(item.id || '').trim();
+                const timestamp = Number(item.timestamp) || new Date(item.timestamp).getTime();
+                if (!id || !Number.isFinite(timestamp)) return [];
+                return [{ ...item, id, timestamp, time: item.time || new Date(timestamp).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) }];
+            });
+        };
+
+        const parseCsvLine = (line) => {
+            const values = [];
+            const pattern = /(?:^|,)(?:"((?:""|[^"])*)"|([^",]*))/g;
+            let match;
+            while ((match = pattern.exec(line)) !== null) values.push((match[1] ?? match[2] ?? '').replace(/""/g, ''));
+            return values;
+        };
+
+        const parseImportedText = (text, filename) => {
+            if (filename.toLowerCase().endsWith('.json') || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+                const payload = JSON.parse(text);
+                return normalizeImportedRecords(Array.isArray(payload) ? payload : payload.records || payload.entries);
+            }
+            const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).filter(line => line.trim());
+            if (lines.length < 2) return [];
+            const headers = parseCsvLine(lines[0]).map(header => header.trim().toLowerCase());
+            return normalizeImportedRecords(lines.slice(1).map(line => {
+                const values = parseCsvLine(line);
+                const row = Object.fromEntries(headers.map((header, index) => [header, values[index] || '']));
+                return { id: row.id || row['เลข 5 ตัวท้าย'] || row['เลขท้าย'], timestamp: row.timestamp || row.time || row['เวลา'], birthDate: row.birthdate || row['วันเกิด'], dateString: row.datestring || row['วันที่คีย์กะ'] };
+            }));
+        };
+
+        const importDataFile = (file) => {
+            const reader = new FileReader();
+            reader.onload = async () => {
+                try {
+                    const imported = parseImportedText(String(reader.result), file.name);
+                    if (!imported.length) throw new Error('ไม่มีข้อมูลที่ถูกต้อง');
+                    const existing = await getAllHistory();
+                    await saveBackupSnapshot(existing);
+                    const keys = new Set(existing.map(item => `${item.id}|${item.timestamp}`));
+                    const added = imported.filter(item => {
+                        const key = `${item.id}|${item.timestamp}`;
+                        if (keys.has(key)) return false;
+                        keys.add(key);
+                        return true;
+                    });
+                    await saveHistoryDirectly([...existing, ...added]);
+                    await renderHistory();
+                    showTransferResult(true, 'นำเข้าข้อมูลสำเร็จ', `เพิ่ม ${added.length} รายการ · ข้อมูลเดิมยังอยู่ · เวอร์ชัน ${APP_VERSION}`);
+                } catch (error) {
+                    showTransferResult(false, 'นำเข้าไม่สำเร็จ', 'ไฟล์ไม่ถูกต้องหรือไม่พบข้อมูลที่รองรับ ข้อมูลเดิมยังไม่ถูกแก้ไข');
+                } finally {
+                    importFile.value = '';
+                }
+            };
+            reader.onerror = () => showTransferResult(false, 'อ่านไฟล์ไม่สำเร็จ', 'ข้อมูลเดิมยังไม่ถูกแก้ไข');
+            reader.readAsText(file, 'UTF-8');
+        };
+
+        exportJsonBtn.addEventListener('click', exportJson);
+        exportCsvBtn.addEventListener('click', exportCsv);
+        importFile.addEventListener('change', (event) => {
+            const file = event.target.files?.[0];
+            if (file) importDataFile(file);
+        });
 
         // ตรวจจับเหตุการณ์ถ่ายรูป
         imageInput.addEventListener('change', async (e) => {
