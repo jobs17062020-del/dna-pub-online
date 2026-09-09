@@ -47,12 +47,13 @@
     <!-- Header -->
     <div class="text-center mb-6 mt-4">
         <div class="inline-block bg-indigo-500/10 text-indigo-400 text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-widest mb-2 border border-indigo-500/20">
-            ★ DNA VIP DATABASE (10-DAYS HD) ★
+            ★ DNA VIP DATABASE (100-DAYS HD) ★
         </div>
         <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 tracking-wider neon-glow">
             DNA PUB
         </h1>
         <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
+        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.1.0 · LOCAL SAFE</span>
     </div>
 
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
@@ -75,7 +76,7 @@
     <!-- Loading Spinner -->
     <div id="loading" class="hidden flex flex-col items-center justify-center p-6 glass-card rounded-2xl mb-5 border border-indigo-500/30 shadow-xl">
         <div class="spinner mb-3"></div>
-        <p class="text-indigo-300 font-semibold animate-pulse tracking-wide text-sm">ระบบกำลังบันทึกภาพแบบ HD และตรวจสอบประวัติ 10 วัน...</p>
+        <p class="text-indigo-300 font-semibold animate-pulse tracking-wide text-sm">ระบบกำลังบันทึกภาพแบบ HD และตรวจสอบประวัติ 100 วัน...</p>
     </div>
 
     <!-- ผลลัพธ์การตรวจสอบ -->
@@ -142,7 +143,9 @@
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
+        const APP_VERSION = '1.1.0';
         const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
+        const BACKUP_KEY = 'dna_vip_birthday_backup_v1';
 
         // ตั้งค่า localforage ให้ใช้ IndexedDB เพื่อรองรับรูปภาพความละเอียดสูง
         localforage.config({
@@ -176,21 +179,26 @@
         };
         birthDateInput.value = formatInputDate(new Date());
 
-        // โหลดข้อมูล พร้อมกรองเคสที่เก่ากว่า 100 วัน (ทำงานแบบ Asynchronous สำหรับ IndexedDB)
+        // อ่านข้อมูลทั้งหมดโดยไม่ลบรายการเก่าออกจาก IndexedDB
+        const getAllHistory = async () => {
+            const records = await localforage.getItem(STORAGE_KEY);
+            return Array.isArray(records) ? records : [];
+        };
+
+        // แสดงเฉพาะรายการย้อนหลัง 100 วัน แต่เก็บข้อมูลเต็มไว้ในเครื่อง
         const getCleanedHistory = async () => {
-            let records = await localforage.getItem(STORAGE_KEY);
-            if (!records) records = [];
-
+            const records = await getAllHistory();
             const oneHundredDaysAgo = Date.now() - (100 * 24 * 60 * 60 * 1000);
-            const filtered = records.filter(item => item.timestamp > oneHundredDaysAgo);
+            return records.filter(item => item.timestamp > oneHundredDaysAgo);
+        };
 
-            // เซฟข้อมูลที่คลีนแล้วกลับเข้าเครื่อง
-            await localforage.setItem(STORAGE_KEY, filtered);
-            return filtered;
+        const saveBackupSnapshot = async (data) => {
+            await localforage.setItem(BACKUP_KEY, { app: 'DNA PUB', version: APP_VERSION, savedAt: Date.now(), records: data });
         };
 
         const saveHistoryDirectly = async (data) => {
             await localforage.setItem(STORAGE_KEY, data);
+            await saveBackupSnapshot(data);
         };
 
         const formatThaiDate = (timestamp) => {
@@ -279,7 +287,7 @@
         // ฟังก์ชันลบข้อมูลรายบุคคล
         window.deleteRecord = async (timestamp) => {
             if(confirm("💥 กัปตันต้องการลบประวัติและรูปถ่ายรายการนี้ใช่ไหมครับ?")) {
-                let history = await getCleanedHistory();
+                let history = await getAllHistory();
                 history = history.filter(item => item.timestamp !== timestamp);
                 await saveHistoryDirectly(history);
                 await renderHistory();
@@ -330,12 +338,13 @@
             }
             resultBox.classList.remove('hidden', 'neon-border-green', 'bg-emerald-950/80', 'text-emerald-200', 'border-emerald-500/30', 'neon-border-red', 'bg-rose-950/80', 'text-rose-200', 'border-rose-500/30');
 
-            const history = await getCleanedHistory();
+            const history = await getAllHistory();
+            const visibleHistory = history.filter(item => item.timestamp > Date.now() - (100 * 24 * 60 * 60 * 1000));
             const todayStr = getTodayShiftString();
 
             if (idCode !== "[สแกนภาพถ่ายวีไอพี]") {
                 const cleanInputCode = idCode.replace("ท้ายบัตร: ***", "").replace("คีย์มือ: ***", "");
-                const found = history.find(item => item.id.includes(cleanInputCode));
+                const found = visibleHistory.find(item => item.id.includes(cleanInputCode));
 
                 if (found) {
                     resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
@@ -346,7 +355,7 @@
                 }
             }
 
-            const todayCount = history.filter(item => item.dateString === todayStr).length;
+            const todayCount = visibleHistory.filter(item => item.dateString === todayStr).length;
             if (todayCount >= 100) {
                 resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
                 resultIcon.textContent = "🚫";
@@ -424,7 +433,10 @@
             manualId.value = "";
         });
 
-        // เปิดเว็บมาปุ๊บ คลีนข้อมูลเก่า และแสดงผลประวัติ
+        // สร้าง snapshot สำรองเมื่อเปิดเว็บ โดยไม่ลบข้อมูลเก่า
+        getAllHistory().then(records => records.length && saveBackupSnapshot(records)).catch(() => {});
+
+        // เปิดเว็บและแสดงประวัติย้อนหลัง 100 วัน
         renderHistory();
     </script>
 </body>
