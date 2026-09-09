@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DNA PUB | VIP 10-DAYS TRACKER (HD)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <!-- นำเข้า localForage สำหรับจัดการฐานข้อมูลรูปภาพขนาดใหญ่ (IndexedDB) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Prompt', sans-serif; 
+            background: radial-gradient(circle at top, #1e1b4b 0%, #0f172a 100%);
+        }
+        .neon-glow {
+            text-shadow: 0 0 10px rgba(99, 102, 241, 0.6), 0 0 20px rgba(99, 102, 241, 0.4);
+        }
+        .neon-border-green {
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+            border-color: rgba(16, 185, 129, 0.6);
+        }
+        .neon-border-red {
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.4);
+            border-color: rgba(244, 63, 94, 0.6);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.05);
+            border-left-color: #818cf8;
+            border-radius: 50%;
+            width: 45px;
+            height: 45px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 flex flex-col min-h-screen text-slate-100 selection:bg-indigo-500 selection:text-white">
+
+    <!-- Header -->
+    <div class="text-center mb-6 mt-4">
+        <div class="inline-block bg-indigo-500/10 text-indigo-400 text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-widest mb-2 border border-indigo-500/20">
+            ★ DNA VIP DATABASE (10-DAYS HD) ★
+        </div>
+        <h1 class="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 tracking-wider neon-glow">
+            DNA PUB
+        </h1>
+        <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
+    </div>
+
+    <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
+    <label class="relative overflow-hidden w-full group glass-card rounded-2xl p-7 text-center cursor-pointer shadow-2xl flex flex-col items-center justify-center border border-indigo-500/30 transition-all duration-300 active:scale-95 mb-5">
+        <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 opacity-40 group-hover:opacity-70 transition-opacity"></div>
+        
+        <div class="relative z-10 flex flex-col items-center">
+            <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40 mb-3 group-hover:scale-110 transition-transform duration-300">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <circle cx="12" cy="13" r="3" />
+                </svg>
+            </div>
+            <span class="text-xl font-black text-slate-100 tracking-wide">📸 ถ่ายรูปหรือเลือกภาพวันเกิด</span>
+            <span class="text-xs text-indigo-300 mt-1 font-light">จัดเก็บภาพความละเอียดสูง (HD) อ่านข้อมูลครบถ้วน</span>
+        </div>
+        <input type="file" id="imageInput" accept="image/*" class="hidden">
+    </label>
+
+    <!-- Loading Spinner -->
+    <div id="loading" class="hidden flex flex-col items-center justify-center p-6 glass-card rounded-2xl mb-5 border border-indigo-500/30 shadow-xl">
+        <div class="spinner mb-3"></div>
+        <p class="text-indigo-300 font-semibold animate-pulse tracking-wide text-sm">ระบบกำลังบันทึกภาพแบบ HD และตรวจสอบประวัติ 10 วัน...</p>
+    </div>
+
+    <!-- ผลลัพธ์การตรวจสอบ -->
+    <div id="resultBox" class="hidden rounded-2xl p-4 mb-5 text-center shadow-2xl border-2 transition-all duration-300">
+        <div id="resultIcon" class="text-3xl mb-1"></div>
+        <h2 id="resultText" class="text-lg font-black tracking-wide"></h2>
+        <p id="resultDetails" class="text-xs font-light opacity-90 mt-0.5"></p>
+    </div>
+
+    <!-- คีย์มือกรณีฉุกเฉินหรือเช็กซ้ำ -->
+    <div class="mb-5 glass-card p-4 rounded-2xl">
+        <p class="text-xs text-slate-400 mb-2 font-light">กรณีไม่ต้องการถ่ายรูป ให้พิมพ์ 4 ตัวท้ายตรงนี้:</p>
+        <div class="flex gap-2">
+            <input type="number" id="manualId" placeholder="เลข 4 ตัวท้ายบัตร" class="flex-1 px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all">
+            <button id="manualCheckBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 rounded-xl text-sm active:scale-95 transition-all">บันทึกมือ</button>
+        </div>
+    </div>
+
+    <!-- ประวัติย้อนหลัง 10 วัน -->
+    <div class="flex-1 glass-card rounded-t-3xl p-5 border-t border-slate-700/50 mt-auto shadow-inner">
+        <div class="flex justify-between items-center mb-4">
+            <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 bg-pink-500 rounded-full animate-ping"></span>
+                    <h2 class="text-sm font-semibold tracking-wide text-slate-200">ประวัติสิทธิ์วันเกิด (ย้อนหลัง 10 วัน)</h2>
+                </div>
+                <span class="text-[10px] text-slate-400 mt-0.5">*แตะที่รูปเพื่อขยายใหญ่อ่านข้อมูลได้ชัดเจน 100%</span>
+            </div>
+            <div class="text-right">
+                <span id="countBadge" class="bg-gradient-to-r from-pink-500 to-indigo-600 text-white text-xs px-2.5 py-1 rounded-full font-bold shadow-md">0 / 100 เคสวันนี้</span>
+            </div>
+        </div>
+        <ul id="historyList" class="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+            <!-- ข้อมูลโหลดอัตโนมัติที่นี่ -->
+        </ul>
+    </div>
+
+    <!-- Popup สำหรับขยายดูรูปภาพ (Modal) -->
+    <div id="imageModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 transition-opacity duration-300 opacity-0 backdrop-blur-md">
+        <!-- ปุ่มกากบาทปิด -->
+        <button onclick="closeImageModal()" class="absolute top-6 right-6 text-white bg-slate-800/80 hover:bg-rose-500 rounded-full p-2 w-10 h-10 flex items-center justify-center transition-all shadow-lg border border-slate-600 z-50">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+        <!-- รูปภาพขนาดใหญ่ (เพิ่ม object-contain ให้ภาพไม่เบี้ยว) -->
+        <img id="modalImage" class="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl transition-transform duration-300 transform scale-95 border border-slate-600" src="" alt="VIP Image Full HD">
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const loading = document.getElementById('loading');
+        const resultBox = document.getElementById('resultBox');
+        const resultIcon = document.getElementById('resultIcon');
+        const resultText = document.getElementById('resultText');
+        const resultDetails = document.getElementById('resultDetails');
+        const historyList = document.getElementById('historyList');
+        const countBadge = document.getElementById('countBadge');
+        const manualId = document.getElementById('manualId');
+        const manualCheckBtn = document.getElementById('manualCheckBtn');
+        
+        const imageModal = document.getElementById('imageModal');
+        const modalImage = document.getElementById('modalImage');
+
+        const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
+
+        // ตั้งค่า localforage ให้ใช้ IndexedDB เพื่อรองรับรูปภาพความละเอียดสูง
+        localforage.config({
+            name: 'DNAPub_Database',
+            storeName: 'vip_records_hd'
+        });
+
+        // คำนวณตัดรอบกะที่เวลา 06:00 น.
+        const getTodayShiftString = () => {
+            const now = new Date();
+            const logicalDate = new Date(now.getTime() - (6 * 60 * 60 * 1000));
+            return `${logicalDate.getFullYear()}-${logicalDate.getMonth() + 1}-${logicalDate.getDate()}`;
+        };
+
+        // โหลดข้อมูล พร้อมกรองเคสที่เก่ากว่า 10 วัน (ทำงานแบบ Asynchronous สำหรับ IndexedDB)
+        const getCleanedHistory = async () => {
+            let records = await localforage.getItem(STORAGE_KEY);
+            if (!records) records = [];
+            
+            const tenDaysAgo = Date.now() - (10 * 24 * 60 * 60 * 1000);
+            const filtered = records.filter(item => item.timestamp > tenDaysAgo);
+            
+            // เซฟข้อมูลที่คลีนแล้วกลับเข้าเครื่อง
+            await localforage.setItem(STORAGE_KEY, filtered);
+            return filtered;
+        };
+
+        const saveHistoryDirectly = async (data) => {
+            await localforage.setItem(STORAGE_KEY, data);
+        };
+
+        const formatThaiDate = (timestamp) => {
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            const date = new Date(timestamp);
+            return `${date.getDate()} ${months[date.getMonth()]}`;
+        };
+
+        // ปรับสเกลภาพให้ใหญ่และคมชัด 100% (กว้างสูงสุด 1600px ระดับ HD)
+        const compressImageFile = (file) => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        // ขยาย Max Width เป็น 1600px เพื่อให้อ่านข้อความได้ชัดเจนสุดๆ
+                        const MAX_WIDTH = 1600; 
+                        let scaleSize = 1;
+                        if (img.width > MAX_WIDTH) {
+                            scaleSize = MAX_WIDTH / img.width;
+                        }
+                        
+                        canvas.width = img.width * scaleSize;
+                        canvas.height = img.height * scaleSize;
+                        
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        // บันทึกที่คุณภาพ 90% (0.9) เพื่อให้ภาพคมกริบ
+                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                    };
+                };
+            });
+        };
+
+        // แสดงผลรายการประวัติหน้าร้าน
+        const renderHistory = async () => {
+            historyList.innerHTML = "<div class='text-center py-4'><div class='spinner mx-auto mb-2 w-6 h-6'></div><p class='text-xs text-indigo-300'>กำลังโหลดข้อมูล...</p></div>";
+            
+            const history = await getCleanedHistory();
+            const todayStr = getTodayShiftString();
+            
+            // นับเฉพาะโควตาของวันเกิดในกะวันนี้
+            const todayCount = history.filter(item => item.dateString === todayStr).length;
+            countBadge.innerText = `${todayCount} / 100 เคสวันนี้`;
+            
+            historyList.innerHTML = "";
+            if (history.length === 0) {
+                historyList.innerHTML = "<li class='text-slate-500 text-center py-6 text-xs font-light tracking-wide'>ยังไม่มีข้อมูลบันทึกในรอบ 10 วัน</li>";
+                return;
+            }
+            
+            // แสดงผลเรียงจากใหม่สุดไปเก่าสุด
+            history.slice().reverse().forEach((item) => {
+                const li = document.createElement('li');
+                li.className = "bg-slate-900/60 p-2.5 rounded-xl flex justify-between items-center border border-slate-800 hover:bg-slate-900/90 transition-all";
+                
+                const imgTag = item.image 
+                    ? `<img src="${item.image}" class="w-11 h-11 object-cover rounded-lg border border-slate-700 shadow-sm cursor-pointer active:scale-95 transition-transform" onclick="viewFullImage('${item.image}')">`
+                    : `<div class="w-11 h-11 rounded-lg bg-slate-800 flex items-center justify-center border border-slate-700 text-[10px] text-slate-400">คีย์มือ</div>`;
+
+                const isToday = item.dateString === todayStr;
+                const badgeColor = isToday ? 'border-indigo-500/30 text-indigo-300' : 'border-slate-700/30 text-slate-500 bg-slate-950/40';
+
+                li.innerHTML = `
+                    <div class="flex items-center gap-3 flex-1 min-w-0">
+                        ${imgTag}
+                        <div class="min-w-0 flex-1">
+                            <span class="text-slate-200 font-bold text-xs block truncate">${item.id}</span>
+                            <span class="text-[10px] text-slate-400">${formatThaiDate(item.timestamp)} • วันที่คีย์กะ: ${item.dateString}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-semibold bg-slate-950 px-2 py-1 rounded border ${badgeColor}">${item.time} น.</span>
+                        <button onclick="deleteRecord(${item.timestamp})" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 p-1.5 rounded-lg border border-rose-500/20 active:scale-95 transition-all text-xs font-bold">
+                            ลบ
+                        </button>
+                    </div>
+                `;
+                historyList.appendChild(li);
+            });
+        };
+
+        // ฟังก์ชันลบข้อมูลรายบุคคล
+        window.deleteRecord = async (timestamp) => {
+            if(confirm("💥 กัปตันต้องการลบประวัติและรูปถ่ายรายการนี้ใช่ไหมครับ?")) {
+                let history = await getCleanedHistory();
+                history = history.filter(item => item.timestamp !== timestamp);
+                await saveHistoryDirectly(history);
+                await renderHistory();
+                
+                resultBox.classList.add('hidden');
+            }
+        };
+
+        // ฟังก์ชันกดดูรูปภาพขนาดใหญ่เต็มตา
+        window.viewFullImage = (base64) => {
+            modalImage.src = base64;
+            imageModal.classList.remove('hidden');
+            setTimeout(() => {
+                imageModal.classList.remove('opacity-0');
+                modalImage.classList.remove('scale-95');
+                modalImage.classList.add('scale-100');
+            }, 10);
+        };
+
+        // ฟังก์ชันปิดรูปภาพ Popup
+        window.closeImageModal = () => {
+            imageModal.classList.add('opacity-0');
+            modalImage.classList.remove('scale-100');
+            modalImage.classList.add('scale-95');
+            setTimeout(() => {
+                imageModal.classList.add('hidden');
+                modalImage.src = "";
+            }, 300);
+        };
+
+        imageModal.addEventListener('click', (e) => {
+            if (e.target === imageModal) {
+                closeImageModal();
+            }
+        });
+
+        // ฟังก์ชันหลักในการตรวจสอบความซ้ำและบันทึกข้อมูล
+        const processAndAutoSave = async (idCode, base64Image = null) => {
+            loading.classList.add('hidden');
+            resultBox.classList.remove('hidden', 'neon-border-green', 'bg-emerald-950/80', 'text-emerald-200', 'border-emerald-500/30', 'neon-border-red', 'bg-rose-950/80', 'text-rose-200', 'border-rose-500/30');
+            
+            const history = await getCleanedHistory();
+            const todayStr = getTodayShiftString();
+
+            if (idCode !== "[สแกนภาพถ่ายวีไอพี]") {
+                const cleanInputCode = idCode.replace("ท้ายบัตร: ***", "").replace("คีย์มือ: ***", "");
+                const found = history.find(item => item.id.includes(cleanInputCode));
+                
+                if (found) {
+                    resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
+                    resultIcon.textContent = "🛑";
+                    resultText.textContent = "สิทธิ์ซ้ำ! เคยใช้ใน 10 วันนี้แล้ว";
+                    resultDetails.textContent = `เลขบัตรนี้ เคยทำรายการไปแล้วเมื่อวันที่ ${formatThaiDate(found.timestamp)} เวลา ${found.time} น.`;
+                    return;
+                }
+            }
+
+            const todayCount = history.filter(item => item.dateString === todayStr).length;
+            if (todayCount >= 100) {
+                resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
+                resultIcon.textContent = "🚫";
+                resultText.textContent = "บันทึกไม่ได้! เต็มโควตาวันนี้";
+                resultDetails.textContent = "วันนี้บันทึกครบโควตา 100 รายการเรียบร้อยแล้วครับกัปตัน";
+                return;
+            }
+
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+            
+            history.push({
+                id: idCode,
+                timestamp: now.getTime(),
+                dateString: todayStr,
+                time: timeStr,
+                image: base64Image
+            });
+            
+            await saveHistoryDirectly(history);
+            await renderHistory();
+
+            resultBox.classList.add('neon-border-green', 'bg-emerald-950/80', 'text-emerald-200');
+            resultIcon.textContent = "✨";
+            resultText.textContent = "บันทึกข้อมูลสดสำเร็จ!";
+            resultDetails.textContent = `ข้อมูลถูกบันทึกเรียบร้อย ปลอดภัย 100% (เวลา ${timeStr} น.)`;
+        };
+
+        // ตรวจจับเหตุการณ์ถ่ายรูป
+        imageInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            resultBox.classList.add('hidden');
+            loading.classList.remove('hidden');
+            
+            try {
+                const base64Img = await compressImageFile(file);
+
+                let detectedId = "[สแกนภาพถ่ายวีไอพี]";
+                try {
+                    const worker = await Tesseract.createWorker('eng');
+                    // สแกนจากไฟล์ต้นฉบับเพื่อให้แม่นยำที่สุด
+                    const ret = await worker.recognize(file);
+                    await worker.terminate();
+                    const digits = ret.data.text.replace(/\D/g, '');
+                    if (digits.length >= 4) {
+                        detectedId = "ท้ายบัตร: ***" + digits.slice(-4);
+                    }
+                } catch(err) {
+                    // ปล่อยผ่านกรณีสแกนข้อความไม่สำเร็จ
+                }
+
+                await processAndAutoSave(detectedId, base64Img);
+
+            } catch (error) {
+                loading.classList.add('hidden');
+                alert("เกิดข้อผิดพลาดระหว่างจัดเก็บข้อมูล กรุณาลองใหม่อีกครั้งครับกัปตัน");
+            } finally {
+                imageInput.value = ""; 
+            }
+        });
+
+        // ตรวจจับปุ่มคีย์มือ
+        manualCheckBtn.addEventListener('click', async () => {
+            const val = manualId.value.trim();
+            if (val.length < 1) {
+                alert("กรุณากรอกเลขท้ายบัตรประชาชนก่อนครับ");
+                return;
+            }
+            const finalId = "คีย์มือ: ***" + val.slice(-4);
+            await processAndAutoSave(finalId, null);
+            manualId.value = "";
+        });
+
+        // เปิดเว็บมาปุ๊บ คลีนข้อมูลเก่า และแสดงผลประวัติ
+        renderHistory();
+    </script>
+</body>
+</html>

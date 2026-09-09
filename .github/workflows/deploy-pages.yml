@@ -33,6 +33,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm exec vite build
+      - name: Publish original baseline page
+        run: mkdir -p dist/public/original && cp original/index.html dist/public/original/index.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
         with:
