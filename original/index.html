@@ -55,7 +55,7 @@
             DNA PUB
         </h1>
         <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
-        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.1 · OFFLINE SAFE</span>
+        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.2 · OFFLINE SAFE</span>
     </div>
 
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
@@ -107,7 +107,7 @@
     <div class="mb-5 glass-card p-4 rounded-2xl border border-emerald-500/20">
         <div class="flex items-center justify-between gap-2 mb-2">
             <p class="text-xs text-emerald-300 font-semibold">สำรอง / ส่งออก / นำเข้าข้อมูล</p>
-            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.1</span>
+            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.2</span>
         </div>
         <p class="text-[10px] text-slate-400 mb-3">นำเข้าแล้วจะรวมกับข้อมูลเดิม ไม่ลบหรือเขียนทับรายการเดิม</p>
         <div class="flex gap-2 flex-wrap">
@@ -169,7 +169,7 @@
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
-        const APP_VERSION = '1.3.1';
+        const APP_VERSION = '1.3.2';
         const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
         const BACKUP_KEY = 'dna_vip_birthday_backup_v1';
 
@@ -583,7 +583,15 @@
 
         // ลงทะเบียน PWA เพื่อแคชหน้าเว็บและไลบรารีสำหรับการใช้งานออฟไลน์
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('./sw.js').catch(() => {});
+            navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(registration => {
+                registration.update().catch(() => {});
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!sessionStorage.getItem('dna-pub-sw-reloaded-1.3.2')) {
+                        sessionStorage.setItem('dna-pub-sw-reloaded-1.3.2', '1');
+                        window.location.reload();
+                    }
+                });
+            }).catch(() => {});
         }
 
         // สร้าง snapshot สำรองเมื่อเปิดเว็บ โดยไม่ลบข้อมูลเก่า

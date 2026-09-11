@@ -1,4 +1,5 @@
-const CACHE_NAME = 'dna-pub-v1.3.0-shell';
+const APP_VERSION = '1.3.2';
+const CACHE_NAME = `dna-pub-v${APP_VERSION}-shell`;
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,7 +14,7 @@ self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
     await Promise.all(CORE_ASSETS.map(async asset => {
-      try { await cache.add(asset); } catch (_) { /* CDN บางแห่งอาจปฏิเสธ cache ข้ามโดเมน */ }
+      try { await cache.add(asset); } catch (_) { /* เก็บเท่าที่ CDN อนุญาต */ }
     }));
     await self.skipWaiting();
   })());
@@ -29,14 +30,30 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  const isNavigation = event.request.mode === 'navigate' || event.request.destination === 'document';
+
   event.respondWith((async () => {
+    // หน้า HTML ใช้ network-first เพื่อให้มือถือเห็นเวอร์ชันใหม่ทันทีเมื่อมีเน็ต
+    if (isNavigation) {
+      try {
+        const fresh = await fetch(event.request, { cache: 'no-store' });
+        if (fresh.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put('./index.html', fresh.clone());
+          return fresh;
+        }
+      } catch (_) { /* ออฟไลน์: ใช้สำเนาใน cache */ }
+      return (await caches.match('./index.html')) || (await caches.match('./'));
+    }
+
+    // ไลบรารีและไฟล์ประกอบใช้ cache-first เพื่อทำงานออฟไลน์
     const cached = await caches.match(event.request);
     if (cached) return cached;
     try {
       const response = await fetch(event.request);
       if (response.ok || response.type === 'opaque') {
         const cache = await caches.open(CACHE_NAME);
-        cache.put(event.request, response.clone());
+        await cache.put(event.request, response.clone());
       }
       return response;
     } catch (_) {
