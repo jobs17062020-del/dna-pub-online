@@ -55,7 +55,7 @@
             DNA PUB
         </h1>
         <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
-        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.0 · OFFLINE SAFE</span>
+        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.1 · OFFLINE SAFE</span>
     </div>
 
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
@@ -95,7 +95,10 @@
         <p class="text-xs text-slate-400 mb-2 font-light">กรณีไม่ต้องการถ่ายรูป ให้พิมพ์เลข 5 ตัวท้ายและวันเกิด:</p>
         <div class="flex gap-2 flex-wrap">
             <input type="text" id="manualId" inputmode="numeric" maxlength="5" placeholder="เลข 5 ตัวท้าย" class="flex-1 min-w-[150px] px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all">
-            <input type="date" id="birthDate" class="flex-1 min-w-[150px] px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all" aria-label="วันเกิด">
+            <div class="flex-1 min-w-[150px]">
+                <input type="date" id="birthDate" class="w-full px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all" aria-label="วันเกิด">
+                <p id="birthDateStatus" class="mt-1 text-[10px] font-semibold text-emerald-300"></p>
+            </div>
             <button id="manualCheckBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-4 rounded-xl text-sm active:scale-95 transition-all">บันทึกมือ</button>
         </div>
     </div>
@@ -104,7 +107,7 @@
     <div class="mb-5 glass-card p-4 rounded-2xl border border-emerald-500/20">
         <div class="flex items-center justify-between gap-2 mb-2">
             <p class="text-xs text-emerald-300 font-semibold">สำรอง / ส่งออก / นำเข้าข้อมูล</p>
-            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.0</span>
+            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.1</span>
         </div>
         <p class="text-[10px] text-slate-400 mb-3">นำเข้าแล้วจะรวมกับข้อมูลเดิม ไม่ลบหรือเขียนทับรายการเดิม</p>
         <div class="flex gap-2 flex-wrap">
@@ -157,6 +160,7 @@
         const countBadge = document.getElementById('countBadge');
         const manualId = document.getElementById('manualId');
         const birthDateInput = document.getElementById('birthDate');
+        const birthDateStatus = document.getElementById('birthDateStatus');
         const manualCheckBtn = document.getElementById('manualCheckBtn');
         const exportJsonBtn = document.getElementById('exportJsonBtn');
         const exportCsvBtn = document.getElementById('exportCsvBtn');
@@ -165,7 +169,7 @@
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
-        const APP_VERSION = '1.3.0';
+        const APP_VERSION = '1.3.1';
         const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
         const BACKUP_KEY = 'dna_vip_birthday_backup_v1';
 
@@ -187,6 +191,26 @@
             return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`;
         };
 
+        const getBirthWindow = () => {
+            const today = new Date();
+            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            return { todayOnly, min: new Date(todayOnly.getTime() - 3 * 86400000), max: new Date(todayOnly.getTime() + 3 * 86400000) };
+        };
+
+        const updateBirthDateStatus = () => {
+            const { todayOnly, min, max } = getBirthWindow();
+            const selected = birthDateInput.value ? new Date(`${birthDateInput.value}T00:00:00`) : todayOnly;
+            const difference = Math.round((selected.getTime() - todayOnly.getTime()) / 86400000);
+            const allowed = difference >= -3 && difference <= 3;
+            birthDateInput.classList.toggle('border-emerald-400', allowed);
+            birthDateInput.classList.toggle('border-rose-500', !allowed);
+            birthDateStatus.className = `mt-1 text-[10px] font-semibold ${allowed ? 'text-emerald-300' : 'text-rose-300'}`;
+            birthDateStatus.textContent = allowed
+                ? `อยู่ในเงื่อนไข: ${formatInputDate(min)} ถึง ${formatInputDate(max)} · วันนี้ ${formatInputDate(todayOnly)}`
+                : `ไม่อยู่ในเงื่อนไข: ต้องอยู่ระหว่าง ${formatInputDate(min)} ถึง ${formatInputDate(max)} · ไม่บันทึกเคส`;
+            return allowed;
+        };
+
         const validateBirthDate = (birthDate) => {
             if (!birthDate) return { valid: false, message: 'กรุณาเลือกวันเกิดก่อนบันทึก' };
             const [year, month, day] = birthDate.split('-').map(Number);
@@ -200,6 +224,8 @@
             return { valid: true, message: '' };
         };
         birthDateInput.value = formatInputDate(new Date());
+        birthDateInput.addEventListener('change', updateBirthDateStatus);
+        updateBirthDateStatus();
 
         // อ่านข้อมูลทั้งหมดโดยไม่ลบรายการเก่าออกจาก IndexedDB
         const getAllHistory = async () => {
@@ -384,6 +410,7 @@
         const processAndAutoSave = async (idCode, base64Image = null, birthDate = formatInputDate(new Date())) => {
             loading.classList.add('hidden');
             const birthValidation = validateBirthDate(birthDate);
+            updateBirthDateStatus();
             if (!birthValidation.valid) {
                 resultBox.classList.remove('hidden');
                 resultBox.classList.add('neon-border-red', 'bg-rose-950/80', 'text-rose-200');
