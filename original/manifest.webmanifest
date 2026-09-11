@@ -1,0 +1,11 @@
+{
+  "name": "DNA PUB VIP Database",
+  "short_name": "DNA PUB",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#1e1b4b",
+  "lang": "th",
+  "icons": []
+}

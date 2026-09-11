@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>DNA PUB | VIP 10-DAYS TRACKER (HD)</title>
+    <title>DNA PUB | VIP 100-DAYS OFFLINE</title>
+    <meta name="theme-color" content="#1e1b4b">
+    <link rel="manifest" href="./manifest.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <!-- นำเข้า localForage สำหรับจัดการฐานข้อมูลรูปภาพขนาดใหญ่ (IndexedDB) -->
@@ -53,25 +55,27 @@
             DNA PUB
         </h1>
         <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
-        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.2.0 · LOCAL SAFE</span>
+        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.0 · OFFLINE SAFE</span>
     </div>
 
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
-    <label class="relative overflow-hidden w-full group glass-card rounded-2xl p-7 text-center cursor-pointer shadow-2xl flex flex-col items-center justify-center border border-indigo-500/30 transition-all duration-300 active:scale-95 mb-5">
-        <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 opacity-40 group-hover:opacity-70 transition-opacity"></div>
-
+    <div class="relative overflow-hidden w-full group glass-card rounded-2xl p-7 text-center shadow-2xl border border-indigo-500/30 mb-5">
+        <div class="absolute inset-0 bg-gradient-to-r from-indigo-600/20 via-purple-600/20 to-pink-600/20 opacity-40"></div>
         <div class="relative z-10 flex flex-col items-center">
-            <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40 mb-3 group-hover:scale-110 transition-transform duration-300">
+            <div class="w-16 h-16 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-indigo-500/40 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                     <circle cx="12" cy="13" r="3" />
                 </svg>
             </div>
-            <span class="text-xl font-black text-slate-100 tracking-wide">📸 ถ่ายรูปหรือเลือกภาพวันเกิด</span>
-            <span class="text-xs text-indigo-300 mt-1 font-light">จัดเก็บภาพความละเอียดสูง (HD) อ่านข้อมูลครบถ้วน</span>
+            <div class="flex gap-2 flex-wrap justify-center mb-3">
+                <label class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer active:scale-95 transition-all">ถ่ายด้วยกล้อง<input type="file" id="cameraInput" accept="image/*" capture="environment" class="hidden"></label>
+                <label class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-4 py-2.5 rounded-xl cursor-pointer active:scale-95 transition-all">เลือกรูปจากเครื่อง<input type="file" id="imageInput" accept="image/*" class="hidden"></label>
+            </div>
+            <span class="text-xl font-black text-slate-100 tracking-wide">📸 ภาพบัตรความละเอียดสูง</span>
+            <span class="text-xs text-indigo-300 mt-1 font-light">ต้นฉบับจะถูกอ่านและบันทึกในเครื่องแบบออฟไลน์</span>
         </div>
-        <input type="file" id="imageInput" accept="image/*" class="hidden">
-    </label>
+    </div>
 
     <!-- Loading Spinner -->
     <div id="loading" class="hidden flex flex-col items-center justify-center p-6 glass-card rounded-2xl mb-5 border border-indigo-500/30 shadow-xl">
@@ -100,7 +104,7 @@
     <div class="mb-5 glass-card p-4 rounded-2xl border border-emerald-500/20">
         <div class="flex items-center justify-between gap-2 mb-2">
             <p class="text-xs text-emerald-300 font-semibold">สำรอง / ส่งออก / นำเข้าข้อมูล</p>
-            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.2.0</span>
+            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.0</span>
         </div>
         <p class="text-[10px] text-slate-400 mb-3">นำเข้าแล้วจะรวมกับข้อมูลเดิม ไม่ลบหรือเขียนทับรายการเดิม</p>
         <div class="flex gap-2 flex-wrap">
@@ -143,6 +147,7 @@
 
     <script>
         const imageInput = document.getElementById('imageInput');
+        const cameraInput = document.getElementById('cameraInput');
         const loading = document.getElementById('loading');
         const resultBox = document.getElementById('resultBox');
         const resultIcon = document.getElementById('resultIcon');
@@ -160,7 +165,7 @@
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
-        const APP_VERSION = '1.2.0';
+        const APP_VERSION = '1.3.0';
         const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
         const BACKUP_KEY = 'dna_vip_birthday_backup_v1';
 
@@ -268,8 +273,8 @@
                     img.src = event.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        // ขยาย Max Width เป็น 1600px เพื่อให้อ่านข้อความได้ชัดเจนสุดๆ
-                        const MAX_WIDTH = 1600;
+                        // ขยาย Max Width เป็น 2400px เพื่อเก็บรายละเอียดภาพบัตรให้มากขึ้น
+                        const MAX_WIDTH = 2400;
                         let scaleSize = 1;
                         if (img.width > MAX_WIDTH) {
                             scaleSize = MAX_WIDTH / img.width;
@@ -280,8 +285,8 @@
 
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        // บันทึกที่คุณภาพ 90% (0.9) เพื่อให้ภาพคมกริบ
-                        resolve(canvas.toDataURL('image/jpeg', 0.9));
+                        // เก็บรายละเอียดสูง โดยลดขนาดเฉพาะภาพที่กว้างเกิน 2400px
+                        resolve(canvas.toDataURL('image/jpeg', 0.95));
                     };
                 };
             });
@@ -505,40 +510,36 @@
             if (file) importDataFile(file);
         });
 
-        // ตรวจจับเหตุการณ์ถ่ายรูป
-        imageInput.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
+        // กล้องและเลือกรูปจากเครื่องใช้กระบวนการเดียวกัน
+        const handleImageSelection = async (file, sourceInput) => {
             if (!file) return;
-
             resultBox.classList.add('hidden');
             loading.classList.remove('hidden');
-
             try {
                 const base64Img = await compressImageFile(file);
-
                 let detectedId = "[สแกนภาพถ่ายวีไอพี]";
                 try {
-                    const worker = await Tesseract.createWorker('eng');
-                    // สแกนจากไฟล์ต้นฉบับเพื่อให้แม่นยำที่สุด
-                    const ret = await worker.recognize(file);
-                    await worker.terminate();
-                    const digits = ret.data.text.replace(/\D/g, '');
-                    if (digits.length >= 5) {
-                        detectedId = "ท้ายบัตร: ***" + digits.slice(-5);
+                    if (typeof Tesseract !== 'undefined') {
+                        const worker = await Tesseract.createWorker('eng');
+                        const ret = await worker.recognize(file);
+                        await worker.terminate();
+                        const digits = ret.data.text.replace(/\D/g, '');
+                        if (digits.length >= 5) detectedId = "ท้ายบัตร: ***" + digits.slice(-5);
                     }
-                } catch(err) {
-                    // ปล่อยผ่านกรณีสแกนข้อความไม่สำเร็จ
+                } catch (err) {
+                    // หาก OCR ออฟไลน์ยังไม่พร้อม จะยังเก็บภาพไว้และให้คีย์มือแทนได้
                 }
-
                 await processAndAutoSave(detectedId, base64Img);
-
             } catch (error) {
                 loading.classList.add('hidden');
-                alert("เกิดข้อผิดพลาดระหว่างจัดเก็บข้อมูล กรุณาลองใหม่อีกครั้งครับกัปตัน");
+                showTransferResult(false, 'บันทึกภาพไม่สำเร็จ', 'ลองถ่ายใหม่หรือเลือกภาพจากเครื่องอีกครั้ง');
             } finally {
-                imageInput.value = "";
+                sourceInput.value = '';
             }
-        });
+        };
+
+        imageInput.addEventListener('change', event => handleImageSelection(event.target.files[0], imageInput));
+        cameraInput.addEventListener('change', event => handleImageSelection(event.target.files[0], cameraInput));
 
         // ตรวจจับปุ่มคีย์มือ
         manualCheckBtn.addEventListener('click', async () => {
@@ -552,6 +553,11 @@
             await processAndAutoSave(finalId, null, selectedBirthDate);
             manualId.value = "";
         });
+
+        // ลงทะเบียน PWA เพื่อแคชหน้าเว็บและไลบรารีสำหรับการใช้งานออฟไลน์
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
 
         // สร้าง snapshot สำรองเมื่อเปิดเว็บ โดยไม่ลบข้อมูลเก่า
         getAllHistory().then(records => records.length && saveBackupSnapshot(records)).catch(() => {});
