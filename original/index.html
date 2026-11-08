@@ -186,14 +186,18 @@
             return `${logicalDate.getFullYear()}-${logicalDate.getMonth() + 1}-${logicalDate.getDate()}`;
         };
 
+        const getShiftDateOnly = () => {
+            const [year, month, day] = getTodayShiftString().split('-').map(Number);
+            return new Date(year, month - 1, day);
+        };
+
         const formatInputDate = (date) => {
             const local = new Date(date);
             return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(local.getDate()).padStart(2, '0')}`;
         };
 
         const getBirthWindow = () => {
-            const today = new Date();
-            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const todayOnly = getShiftDateOnly();
             return { todayOnly, min: new Date(todayOnly.getTime() - 3 * 86400000), max: new Date(todayOnly.getTime() + 3 * 86400000) };
         };
 
@@ -215,8 +219,7 @@
             if (!birthDate) return { valid: false, message: 'กรุณาเลือกวันเกิดก่อนบันทึก' };
             const [year, month, day] = birthDate.split('-').map(Number);
             const selected = new Date(year, month - 1, day);
-            const today = new Date();
-            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const todayOnly = getShiftDateOnly();
             const difference = Math.round((selected.getTime() - todayOnly.getTime()) / 86400000);
             if (difference < -3 || difference > 3) {
                 return { valid: false, message: `วันเกิดเกินช่วงที่อนุญาต ต้องอยู่ระหว่าง ${formatInputDate(new Date(todayOnly.getTime() - 3 * 86400000))} ถึง ${formatInputDate(new Date(todayOnly.getTime() + 3 * 86400000))}` };
