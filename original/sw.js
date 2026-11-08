@@ -1,4 +1,4 @@
-const APP_VERSION = '1.3.5';
+const APP_VERSION = '1.3.6';
 const CACHE_NAME = `dna-pub-v${APP_VERSION}-shell`;
 const CORE_ASSETS = [
   './',

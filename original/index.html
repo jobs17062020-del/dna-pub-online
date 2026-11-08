@@ -33,6 +33,17 @@
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.05);
         }
+        .calendar-day {
+            min-height: 42px;
+            border-radius: 0.75rem;
+            color: #e2e8f0;
+            transition: background-color 0.15s ease;
+        }
+        .calendar-day:hover { background: rgba(71, 85, 105, 0.75); }
+        .calendar-day-workday { box-shadow: inset 0 0 0 2px rgba(251, 191, 36, 0.95); color: #fde68a; }
+        .calendar-day-today { border: 1px solid rgba(56, 189, 248, 0.95); }
+        .calendar-day-selected { background: #6366f1; color: #fff; }
+        .calendar-day-selected:hover { background: #4f46e5; }
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.05);
             border-left-color: #818cf8;
@@ -55,7 +66,7 @@
             DNA PUB
         </h1>
         <p class="text-xs text-slate-400 mt-1 font-light tracking-wide">ระบบบันทึกความปลอดภัยสูง • จัดเก็บภาพคมชัด 100%</p>
-        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.5 · OFFLINE SAFE</span>
+        <span class="inline-block mt-2 bg-slate-900/70 text-indigo-300 text-[10px] px-2.5 py-1 rounded-full border border-indigo-500/30">เวอร์ชัน 1.3.6 · OFFLINE SAFE</span>
     </div>
 
     <!-- ปุ่มถ่ายภาพ/เลือกภาพหลัก -->
@@ -96,7 +107,11 @@
         <div class="flex gap-2 flex-wrap">
             <input type="text" id="manualId" inputmode="numeric" maxlength="6" placeholder="เลข 5 หรือ 6 ตัวท้าย" class="flex-1 min-w-[150px] px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all">
             <div class="flex-1 min-w-[150px]">
-                <input type="date" id="birthDate" class="w-full px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm focus:outline-none focus:border-indigo-500 transition-all" aria-label="วันเกิด">
+                <input type="hidden" id="birthDate" aria-label="วันเกิด">
+                <button type="button" id="birthDatePickerButton" aria-label="วันเกิด" aria-haspopup="dialog" aria-expanded="false" class="w-full flex items-center justify-between gap-2 px-4 py-2.5 bg-black/30 border border-slate-700 rounded-xl text-white font-semibold text-sm text-left focus:outline-none focus:border-indigo-500 transition-all">
+                    <span id="birthDatePickerText"></span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </button>
                 <p id="birthDateStatus" class="mt-1 text-[10px] font-semibold text-emerald-300"></p>
                 <p id="workdayDateStatus" class="mt-1 text-[10px] font-light text-slate-400"></p>
             </div>
@@ -104,11 +119,34 @@
         </div>
     </div>
 
+    <div id="birthDateCalendar" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-label="เลือกวันเกิด">
+        <div class="glass-card w-full max-w-sm rounded-2xl border border-indigo-400/30 p-4 shadow-2xl">
+            <div class="flex items-center justify-between gap-2 mb-3">
+                <button type="button" id="calendarPrevMonth" aria-label="เดือนก่อน" class="w-10 h-10 rounded-full text-2xl text-slate-300 hover:bg-slate-700">‹</button>
+                <h2 id="calendarMonthLabel" class="text-base font-bold text-slate-100 text-center"></h2>
+                <button type="button" id="calendarNextMonth" aria-label="เดือนถัดไป" class="w-10 h-10 rounded-full text-2xl text-slate-300 hover:bg-slate-700">›</button>
+            </div>
+            <p id="calendarDateNotice" class="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-200"></p>
+            <div id="calendarWeekdays" class="grid grid-cols-7 gap-1 mb-1 text-center text-[10px] font-semibold text-slate-400"></div>
+            <div id="calendarDays" class="grid grid-cols-7 gap-1 text-center"></div>
+            <div class="flex flex-wrap items-center justify-between gap-2 mt-3">
+                <div class="flex flex-wrap gap-3 text-[10px] text-slate-400">
+                    <span><i class="inline-block w-2.5 h-2.5 rounded-full border border-sky-400 align-middle mr-1"></i>วันนี้จริง</span>
+                    <span><i class="inline-block w-2.5 h-2.5 rounded-full ring-2 ring-amber-400 align-middle mr-1"></i>วันทำงาน</span>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" id="calendarCurrentMonth" class="px-3 py-2 rounded-lg bg-slate-700 text-slate-200 text-xs">เดือนนี้</button>
+                    <button type="button" id="calendarClose" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold">ปิด</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- สำรองและถ่ายโอนข้อมูล -->
     <div class="mb-5 glass-card p-4 rounded-2xl border border-emerald-500/20">
         <div class="flex items-center justify-between gap-2 mb-2">
             <p class="text-xs text-emerald-300 font-semibold">สำรอง / ส่งออก / นำเข้าข้อมูล</p>
-            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.5</span>
+            <span class="text-[10px] text-slate-400">เวอร์ชัน 1.3.6</span>
         </div>
         <p class="text-[10px] text-slate-400 mb-3">นำเข้าแล้วจะรวมกับข้อมูลเดิม ไม่ลบหรือเขียนทับรายการเดิม</p>
         <div class="flex gap-2 flex-wrap">
@@ -161,6 +199,13 @@
         const countBadge = document.getElementById('countBadge');
         const manualId = document.getElementById('manualId');
         const birthDateInput = document.getElementById('birthDate');
+        const birthDatePickerButton = document.getElementById('birthDatePickerButton');
+        const birthDatePickerText = document.getElementById('birthDatePickerText');
+        const birthDateCalendar = document.getElementById('birthDateCalendar');
+        const calendarDateNotice = document.getElementById('calendarDateNotice');
+        const calendarMonthLabel = document.getElementById('calendarMonthLabel');
+        const calendarWeekdays = document.getElementById('calendarWeekdays');
+        const calendarDays = document.getElementById('calendarDays');
         const birthDateStatus = document.getElementById('birthDateStatus');
         const workdayDateStatus = document.getElementById('workdayDateStatus');
         const manualCheckBtn = document.getElementById('manualCheckBtn');
@@ -171,7 +216,7 @@
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
 
-        const APP_VERSION = '1.3.5';
+        const APP_VERSION = '1.3.6';
         const STORAGE_KEY = 'dna_vip_birthday_10days_hd_v1';
         const BACKUP_KEY = 'dna_vip_birthday_backup_v1';
 
@@ -229,14 +274,73 @@
             return { todayOnly, min: new Date(todayOnly.getTime() - 3 * 86400000), max: new Date(todayOnly.getTime() + 3 * 86400000) };
         };
 
+        const thaiMonthNames = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+        const thaiMonthShort = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+        const thaiWeekdays = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
+        let displayedCalendarMonth = new Date();
+
+        const formatCalendarDate = (date) => `${date.getDate()} ${thaiMonthShort[date.getMonth()]} ${date.getFullYear() + 543}`;
+
+        const renderBirthDateCalendar = () => {
+            const actualToday = new Date();
+            const workdayToday = getShiftDateOnly();
+            calendarDateNotice.textContent = `วันที่ตามปฏิทินจริง: ${formatCalendarDate(actualToday)} · วันทำงาน: ${formatCalendarDate(workdayToday)} (เปลี่ยนวัน 04:00 น.)`;
+            calendarMonthLabel.textContent = `${thaiMonthNames[displayedCalendarMonth.getMonth()]} ${displayedCalendarMonth.getFullYear() + 543}`;
+            calendarWeekdays.innerHTML = '';
+            thaiWeekdays.forEach(day => {
+                const label = document.createElement('span');
+                label.textContent = day;
+                calendarWeekdays.appendChild(label);
+            });
+            calendarDays.innerHTML = '';
+
+            const year = displayedCalendarMonth.getFullYear();
+            const month = displayedCalendarMonth.getMonth();
+            const offset = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            for (let i = 0; i < offset; i++) {
+                const emptyCell = document.createElement('span');
+                emptyCell.setAttribute('aria-hidden', 'true');
+                calendarDays.appendChild(emptyCell);
+            }
+
+            const actualTodayValue = formatInputDate(actualToday);
+            const workdayTodayValue = formatInputDate(workdayToday);
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(year, month, day);
+                const dateValue = formatInputDate(date);
+                const dayButton = document.createElement('button');
+                const isToday = dateValue === actualTodayValue;
+                const isWorkday = dateValue === workdayTodayValue;
+                const isSelected = dateValue === birthDateInput.value;
+                dayButton.type = 'button';
+                dayButton.className = 'calendar-day';
+                if (isWorkday) dayButton.classList.add('calendar-day-workday');
+                if (isToday) dayButton.classList.add('calendar-day-today');
+                if (isSelected) dayButton.classList.add('calendar-day-selected');
+                dayButton.dataset.date = dateValue;
+                dayButton.textContent = day;
+                dayButton.setAttribute('aria-pressed', String(isSelected));
+                if (isToday) dayButton.setAttribute('aria-current', 'date');
+                dayButton.setAttribute('aria-label', `${formatCalendarDate(date)}${isToday ? ', วันนี้ตามปฏิทินจริง' : ''}${isWorkday ? ', วันทำงาน' : ''}`);
+                calendarDays.appendChild(dayButton);
+            }
+        };
+
+        const closeBirthDateCalendar = () => {
+            birthDateCalendar.classList.add('hidden');
+            birthDatePickerButton.setAttribute('aria-expanded', 'false');
+            birthDatePickerButton.focus();
+        };
+
         const updateBirthDateStatus = () => {
             const { todayOnly, min, max } = getBirthWindow();
             workdayDateStatus.textContent = `วันที่ตามปฏิทินจริง: ${formatInputDate(new Date())} · วันทำงาน: ${formatInputDate(todayOnly)}`;
             const selected = birthDateInput.value ? new Date(`${birthDateInput.value}T00:00:00`) : todayOnly;
             const difference = Math.round((selected.getTime() - todayOnly.getTime()) / 86400000);
             const allowed = difference >= -3 && difference <= 3;
-            birthDateInput.classList.toggle('border-emerald-400', allowed);
-            birthDateInput.classList.toggle('border-rose-500', !allowed);
+            birthDatePickerButton.classList.toggle('border-emerald-400', allowed);
+            birthDatePickerButton.classList.toggle('border-rose-500', !allowed);
             birthDateStatus.className = `mt-1 text-[10px] font-semibold ${allowed ? 'text-emerald-300' : 'text-rose-300'}`;
             birthDateStatus.textContent = allowed
                 ? `อยู่ในเงื่อนไข: ${formatInputDate(min)} ถึง ${formatInputDate(max)} · วันนี้ ${formatInputDate(todayOnly)}`
@@ -255,8 +359,51 @@
             }
             return { valid: true, message: '' };
         };
-        birthDateInput.value = formatInputDate(new Date());
+        const initialBirthDate = new Date();
+        birthDateInput.value = formatInputDate(initialBirthDate);
+        birthDatePickerText.textContent = formatCalendarDate(initialBirthDate);
         birthDateInput.addEventListener('change', updateBirthDateStatus);
+        birthDatePickerButton.addEventListener('click', () => {
+            const isOpen = !birthDateCalendar.classList.contains('hidden');
+            if (isOpen) {
+                closeBirthDateCalendar();
+                return;
+            }
+            const selectedDate = new Date(`${birthDateInput.value}T00:00:00`);
+            displayedCalendarMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+            renderBirthDateCalendar();
+            birthDateCalendar.classList.remove('hidden');
+            birthDatePickerButton.setAttribute('aria-expanded', 'true');
+            requestAnimationFrame(() => calendarDays.querySelector('[aria-pressed="true"]')?.focus());
+        });
+        document.getElementById('calendarPrevMonth').addEventListener('click', () => {
+            displayedCalendarMonth = new Date(displayedCalendarMonth.getFullYear(), displayedCalendarMonth.getMonth() - 1, 1);
+            renderBirthDateCalendar();
+        });
+        document.getElementById('calendarNextMonth').addEventListener('click', () => {
+            displayedCalendarMonth = new Date(displayedCalendarMonth.getFullYear(), displayedCalendarMonth.getMonth() + 1, 1);
+            renderBirthDateCalendar();
+        });
+        document.getElementById('calendarCurrentMonth').addEventListener('click', () => {
+            const today = new Date();
+            displayedCalendarMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+            renderBirthDateCalendar();
+        });
+        document.getElementById('calendarClose').addEventListener('click', closeBirthDateCalendar);
+        calendarDays.addEventListener('click', event => {
+            const dayButton = event.target.closest('button[data-date]');
+            if (!dayButton) return;
+            birthDateInput.value = dayButton.dataset.date;
+            birthDatePickerText.textContent = formatCalendarDate(new Date(`${dayButton.dataset.date}T00:00:00`));
+            birthDateInput.dispatchEvent(new Event('change', { bubbles: true }));
+            closeBirthDateCalendar();
+        });
+        birthDateCalendar.addEventListener('click', event => {
+            if (event.target === birthDateCalendar) closeBirthDateCalendar();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !birthDateCalendar.classList.contains('hidden')) closeBirthDateCalendar();
+        });
         updateBirthDateStatus();
 
         // อ่านข้อมูลทั้งหมดโดยไม่ลบรายการเก่าออกจาก IndexedDB
@@ -637,8 +784,8 @@
             navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(registration => {
                 registration.update().catch(() => {});
                 navigator.serviceWorker.addEventListener('controllerchange', () => {
-                    if (!sessionStorage.getItem('dna-pub-sw-reloaded-1.3.5')) {
-                        sessionStorage.setItem('dna-pub-sw-reloaded-1.3.5', '1');
+                    if (!sessionStorage.getItem('dna-pub-sw-reloaded-1.3.6')) {
+                        sessionStorage.setItem('dna-pub-sw-reloaded-1.3.6', '1');
                         window.location.reload();
                     }
                 });
